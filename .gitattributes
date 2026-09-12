@@ -1,0 +1,8 @@
+# keep shell scripts + license LF so recovery/zip builds stay POSIX-clean
+*.sh text eol=lf
+update-binary text eol=lf
+updater-script text eol=lf
+LICENSE text eol=lf
+*.py text eol=lf
+*.yml text eol=lf
+*.md text eol=lf
