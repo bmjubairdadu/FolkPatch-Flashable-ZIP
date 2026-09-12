@@ -238,6 +238,9 @@ for d in /sdcard /data/media/0 /external_sd; do
   if [ -d "$d" ]; then echo "$SKEY" > "$d/FolkPatch-key.txt" 2>/dev/null; fi
 done
 ui_print "- Stock image saved: $BKDIR/stock-$TARGET_KIND$SLOT.img"
+if run_cp -f "$WORK/boot.img" /data/boot.img 2>/dev/null; then
+  ui_print "- Origin image also saved to /data/boot.img (official layout)"
+fi
 
 if [ -f kernel-origin ]; then rm -f kernel-origin 2>/dev/null; fi
 mv kernel kernel-origin 2>/dev/null || abort "cannot stage kernel"
@@ -281,6 +284,7 @@ flash_target "$TARGET"
 sync 2>/dev/null
 
 OTHER=""
+INACTIVE_FLASHED=""
 case "$SLOT" in
   _a) OTHER="_b" ;;
   _b) OTHER="_a" ;;
@@ -296,6 +300,7 @@ if [ -n "$OTHER" ]; then
         ui_print "- WARNING: inactive-slot flash failed, current slot is still patched."
       else
         ui_print "- Inactive slot patched."
+        INACTIVE_FLASHED="$p"
       fi
       break
     fi
@@ -307,6 +312,43 @@ for _v in "/dev/block/by-name/vbmeta$SLOT" /dev/block/by-name/vbmeta "/dev/block
     break
   fi
 done
+rm -f "$WORK/boot.img" 2>/dev/null
+_NSZ=$(wc -c < "$WORK/new-boot.img" 2>/dev/null | tr -d ' \t\r\n')
+if [ -n "$_NSZ" ]; then ui_print "- Patched image size: $_NSZ bytes"; fi
+do_cmp() {
+  if command -v cmp >/dev/null 2>&1; then
+    cmp "$1" "$2" >/dev/null 2>&1
+    return $?
+  fi
+  if [ "$BB_OK" = "1" ]; then
+    "$BB" cmp "$1" "$2" >/dev/null 2>&1
+    return $?
+  fi
+  return 2
+}
+verify_slot() {
+  if [ -z "$_NSZ" ] || [ "$_NSZ" = "0" ]; then
+    ui_print "- NOTE: size unknown, skipping readback verify for $2."
+    return 0
+  fi
+  _blocks=$(( ($_NSZ + 511) / 512 ))
+  run_dd "if=$1" of="$WORK/check.img" bs=512 "count=$_blocks" 2>/dev/null
+  do_cmp "$WORK/check.img" "$WORK/new-boot.img"
+  _rc=$?
+  rm -f "$WORK/check.img" 2>/dev/null
+  if [ "$_rc" = "0" ]; then
+    ui_print "- Verify OK: $2 readback matches."
+  elif [ "$_rc" = "2" ]; then
+    ui_print "- NOTE: cmp missing, cannot verify $2."
+  else
+    ui_print "- WARNING: $2 readback MISMATCH! Flash may not have stuck; re-flash or restore stock."
+  fi
+}
+ui_print "- Verifying flashed slot(s) by readback ..."
+verify_slot "$TARGET" "current slot"
+if [ -n "$INACTIVE_FLASHED" ]; then
+  verify_slot "$INACTIVE_FLASHED" "inactive slot"
+fi
 sync 2>/dev/null
 
 if [ -f "$WORK/FolkPatch.apk" ]; then
