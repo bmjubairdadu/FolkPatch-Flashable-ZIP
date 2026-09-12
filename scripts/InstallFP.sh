@@ -221,9 +221,17 @@ if ! kp_run -i kernel -f 2>/dev/null | run_grep -q "CONFIG_KALLSYMS=y"; then
 fi
 ui_print "- Kernel check passed (CONFIG_KALLSYMS=y)"
 
-run_cp -f "$WORK/boot.img" "$BKDIR/stock-$TARGET_KIND$SLOT.img" 2>/dev/null
+if [ -s "$BKDIR/stock-$TARGET_KIND$SLOT.img" ]; then
+  ui_print "- Keeping existing stock backup (re-flash detected)."
+else
+  run_cp -f "$WORK/boot.img" "$BKDIR/stock-$TARGET_KIND$SLOT.img" 2>/dev/null
+fi
 mkdir -p /data/FolkPatch-Backup 2>/dev/null
-run_cp -f "$WORK/boot.img" "/data/FolkPatch-Backup/stock-$TARGET_KIND$SLOT.img" 2>/dev/null
+if [ -s "/data/FolkPatch-Backup/stock-$TARGET_KIND$SLOT.img" ]; then
+  ui_print "- Keeping existing /data stock backup."
+else
+  run_cp -f "$WORK/boot.img" "/data/FolkPatch-Backup/stock-$TARGET_KIND$SLOT.img" 2>/dev/null
+fi
 echo "$SKEY" > /data/FolkPatch-Backup/FolkPatch-key.txt 2>/dev/null
 echo "$SKEY" > "$BKDIR/FolkPatch-key.txt" 2>/dev/null
 for d in /sdcard /data/media/0 /external_sd; do
@@ -292,10 +300,6 @@ if [ -n "$OTHER" ]; then
       break
     fi
   done
-  if command -v bootctl >/dev/null 2>&1; then
-    bootctl mark-boot-successful >/dev/null 2>&1
-    ui_print "- Boot slot marked successful (anti-fallback)."
-  fi
 fi
 for _v in "/dev/block/by-name/vbmeta$SLOT" /dev/block/by-name/vbmeta "/dev/block/bootdevice/by-name/vbmeta$SLOT"; do
   if [ -e "$_v" ]; then
