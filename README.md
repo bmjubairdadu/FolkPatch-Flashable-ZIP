@@ -33,8 +33,8 @@ Get the ZIPs from the
 
 | File | What it does |
 |---|---|
-| `FolkPatch-v5.0-KP0.13.8-Recovery-Installer.zip` | **Direct flash** — patches & flashes `init_boot` (preferred) or `boot` from recovery. Easiest, but touches partitions. |
-| `FolkPatch-v5.0-KP0.13.8-Boot-Patcher.zip` | **Safe file mode** — patches a stock `boot`/`init_boot` image on your sdcard, **never touches partitions**. You then `fastboot flash` the patched image from a PC. |
+| `FolkPatch-v5.0-KP0.13.8-Recovery-Installer.zip` | ⭐ **Recommended — Direct flash** — patches & flashes `init_boot` (preferred) or `boot` from recovery. Easiest, no PC needed. |
+| `FolkPatch-v5.0-KP0.13.8-Boot-Patcher.zip` | **Safe file mode (advanced)** — patches a stock `boot`/`init_boot` image on your sdcard, **never touches partitions**. You then `fastboot flash` the patched image from a PC. |
 | `FolkPatch-v5.0-KP0.13.8-Uninstaller.zip` | Restores the stock backup, or live-unpatches the kernel. |
 
 Each ZIP also bundles the `FolkPatch-Manager.apk` (copied to sdcard on install)
@@ -49,7 +49,7 @@ Verify integrity with the `SHA256SUMS.txt` attached to the release.
 - 50%+ battery, and keep a **stock boot/init_boot backup + data backup** first
 - If recovery shows a signature error, turn **off** “Zip signature verification”
 
-## Method 1 — Direct flash (Recovery Installer, easy)
+## Method 1 — Direct flash (Recovery Installer, ⭐ recommended)
 
 1. Copy the Installer ZIP (and the APK) to sdcard.
 2. Boot recovery → Install → flash
@@ -59,7 +59,7 @@ Verify integrity with the `SHA256SUMS.txt` attached to the release.
 4. Reboot → install `FolkPatch-Manager.apk` → open the app to verify root.
 5. Bootloop? Flash the **Uninstaller ZIP** or restore your stock image.
 
-## Method 2 — Safe (Boot Patcher + fastboot, recommended)
+## Method 2 — Safe (Boot Patcher + fastboot, advanced)
 
 1. Put your **stock** `boot.img` / `init_boot.img` (from your firmware) on
    sdcard, named:
@@ -122,9 +122,9 @@ ZIPs to the GitHub Release automatically.
 APK rename করে ZIP করলে flash হয় না — recovery-তে `update-binary` +
 installer script লাগে, যা APK-তে থাকে না। এই repo সেই layer যোগ করেছে।
 
-- **সহজ:** Recovery-Installer ZIP flash করো → superkey নোট করো → reboot →
+- **সহজ (recommended):** Recovery-Installer ZIP flash করো → superkey নোট করো → reboot →
   Manager APK install।
-- **নিরাপদ (recommended):** stock `boot.img` sdcard-তে
+- **নিরাপদ (advanced):** stock `boot.img` sdcard-তে
   `FolkPatch-stock-boot.img` নামে রাখো → Boot-Patcher ZIP flash করো →
   `FolkPatch-patched-boot.img` PC থেকে `fastboot flash` করো।
 - Bootloop হলে Uninstaller ZIP flash করো বা stock img restore করো।
