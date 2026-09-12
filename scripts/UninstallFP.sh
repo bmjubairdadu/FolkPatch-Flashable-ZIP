@@ -132,7 +132,7 @@ if [ -z "$TARGET" ]; then abort "no boot/init_boot partition found"; fi
 ui_print "- Target: $TARGET_KIND ($TARGET)"
 
 BACKUP=""
-for d in /sdcard/FolkPatch-Backup /data/media/0/FolkPatch-Backup /external_sd/FolkPatch-Backup /sdcard /data/media/0 /external_sd; do
+for d in /data/FolkPatch-Backup /sdcard/FolkPatch-Backup /data/media/0/FolkPatch-Backup /external_sd/FolkPatch-Backup /data /sdcard /data/media/0 /external_sd; do
   for f in "$d/stock-$TARGET_KIND$SLOT.img" "$d/stock-$TARGET_KIND.img" "$d/boot.img" "$d/stock-boot.img"; do
     if [ -s "$f" ]; then BACKUP="$f"; break; fi
   done
@@ -147,13 +147,33 @@ for d in /sdcard/FolkPatch-Backup /data/media/0/FolkPatch-Backup /external_sd/Fo
   fi
 done
 
+restore_target() {
+  ui_print "- Restoring $1 from: $BACKUP"
+  run_dd "if=$BACKUP" "of=$1" bs=1048576 2>"$WORK/dd_restore.log" || abort "restore failed on $1"
+  print_file "$WORK/dd_restore.log"
+}
+
 if [ -n "$BACKUP" ]; then
   ui_print "- Restoring stock backup: $BACKUP"
-  run_dd "if=$BACKUP" "of=$TARGET" bs=1048576 2>"$WORK/dd_restore.log" || abort "restore failed"
-  print_file "$WORK/dd_restore.log"
+  restore_target "$TARGET"
+  OTHER=""
+  case "$SLOT" in
+    _a) OTHER="_b" ;;
+    _b) OTHER="_a" ;;
+  esac
+  if [ -n "$OTHER" ]; then
+    for p in "/dev/block/by-name/$TARGET_KIND$OTHER" "/dev/block/bootdevice/by-name/$TARGET_KIND$OTHER"; do
+      if [ -e "$p" ] && [ "$p" != "$TARGET" ]; then
+        ui_print "- Also restoring inactive slot ($p) ..."
+        run_dd "if=$BACKUP" "of=$p" bs=1048576 2>"$WORK/dd_restore2.log" || ui_print "- WARNING: inactive-slot restore failed"
+        print_file "$WORK/dd_restore2.log"
+        break
+      fi
+    done
+  fi
   sync 2>/dev/null
   ui_print "****************************"
-  ui_print " Stock image restored. Reboot."
+  ui_print " Stock image restored on all slots. Reboot."
   ui_print "****************************"
   exit 0
 fi

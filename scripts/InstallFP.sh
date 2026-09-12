@@ -222,6 +222,9 @@ fi
 ui_print "- Kernel check passed (CONFIG_KALLSYMS=y)"
 
 run_cp -f "$WORK/boot.img" "$BKDIR/stock-$TARGET_KIND$SLOT.img" 2>/dev/null
+mkdir -p /data/FolkPatch-Backup 2>/dev/null
+run_cp -f "$WORK/boot.img" "/data/FolkPatch-Backup/stock-$TARGET_KIND$SLOT.img" 2>/dev/null
+echo "$SKEY" > /data/FolkPatch-Backup/FolkPatch-key.txt 2>/dev/null
 echo "$SKEY" > "$BKDIR/FolkPatch-key.txt" 2>/dev/null
 for d in /sdcard /data/media/0 /external_sd; do
   if [ -d "$d" ]; then echo "$SKEY" > "$d/FolkPatch-key.txt" 2>/dev/null; fi
@@ -237,6 +240,16 @@ RC=$?
 print_file "$WORK/patch.log"
 if [ "$RC" -ne 0 ]; then abort "patch failed ($RC)"; fi
 
+ui_print "- Verifying patched kernel ..."
+kp_run -i kernel -l >"$WORK/verify.log" 2>&1
+RC=$?
+print_file "$WORK/verify.log"
+if [ "$RC" -ne 0 ]; then abort "patch verification failed to run ($RC)"; fi
+if run_grep -qi "patched=false" "$WORK/verify.log"; then
+  abort "patch verification failed (kernel still reports patched=false)"
+fi
+ui_print "- Patch verified (patched=true)"
+
 if ! kp_run -i kernel-origin -f 2>/dev/null | run_grep -q "CONFIG_KALLSYMS_ALL=y"; then
   ui_print "- WARNING: CONFIG_KALLSYMS_ALL is off; keep stock backup safe."
 fi
@@ -248,11 +261,48 @@ print_file "$WORK/repack.log"
 if [ "$RC" -ne 0 ]; then abort "repack failed ($RC)"; fi
 if [ ! -f "$WORK/new-boot.img" ]; then abort "new-boot.img missing after repack"; fi
 
-ui_print "- Flashing $TARGET ..."
-run_dd "if=$WORK/new-boot.img" "of=$TARGET" bs=1048576 2>"$WORK/dd_write.log"
-RC=$?
-print_file "$WORK/dd_write.log"
-if [ "$RC" -ne 0 ]; then abort "flash failed ($RC). Restore stock image manually!"; fi
+flash_target() {
+  ui_print "- Flashing $1 ..."
+  run_dd "if=$WORK/new-boot.img" "of=$1" bs=1048576 2>"$WORK/dd_write.log"
+  RC=$?
+  print_file "$WORK/dd_write.log"
+  if [ "$RC" -ne 0 ]; then abort "flash failed ($RC) on $1. Restore stock image manually!"; fi
+}
+
+flash_target "$TARGET"
+sync 2>/dev/null
+
+OTHER=""
+case "$SLOT" in
+  _a) OTHER="_b" ;;
+  _b) OTHER="_a" ;;
+esac
+if [ -n "$OTHER" ]; then
+  for p in "/dev/block/by-name/$TARGET_KIND$OTHER" "/dev/block/bootdevice/by-name/$TARGET_KIND$OTHER"; do
+    if [ -e "$p" ] && [ "$p" != "$TARGET" ]; then
+      ui_print "- Also patching inactive slot ($p) ..."
+      run_dd "if=$WORK/new-boot.img" "of=$p" bs=1048576 2>"$WORK/dd_write2.log"
+      RC2=$?
+      print_file "$WORK/dd_write2.log"
+      if [ "$RC2" -ne 0 ]; then
+        ui_print "- WARNING: inactive-slot flash failed, current slot is still patched."
+      else
+        ui_print "- Inactive slot patched."
+      fi
+      break
+    fi
+  done
+  if command -v bootctl >/dev/null 2>&1; then
+    bootctl mark-boot-successful >/dev/null 2>&1
+    ui_print "- Boot slot marked successful (anti-fallback)."
+  fi
+fi
+for _v in "/dev/block/by-name/vbmeta$SLOT" /dev/block/by-name/vbmeta "/dev/block/bootdevice/by-name/vbmeta$SLOT"; do
+  if [ -e "$_v" ]; then
+    ui_print "- NOTE: vbmeta present; both slots patched so no fallback expected."
+    break
+  fi
+done
 sync 2>/dev/null
 
 if [ -f "$WORK/FolkPatch.apk" ]; then
@@ -266,7 +316,8 @@ ui_print "****************************"
 ui_print " FolkPatch installed!"
 ui_print " Key: $SKEY (saved to sdcard)"
 ui_print " Stock backup: $BKDIR/stock-$TARGET_KIND$SLOT.img"
-ui_print " Reboot, install APK, open app to verify."
+ui_print " Both A/B slots patched (no slot fallback)."
+ui_print " Reboot, install APK, app should show Installed/Active."
 ui_print " Bootloop? Flash Uninstaller ZIP or restore stock img."
 ui_print "****************************"
 exit 0
