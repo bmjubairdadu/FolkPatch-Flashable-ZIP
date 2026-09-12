@@ -1,28 +1,31 @@
-# FolkPatch Flashable ZIP — Magisk-Style Recovery Installer
+# FolkPatch Flashable ZIP — Complete Root & Kernel Patcher
 
 [![Build ZIPs](https://github.com/bmjubairdadu/FolkPatch-Flashable-ZIP/actions/workflows/build.yml/badge.svg)](https://github.com/bmjubairdadu/FolkPatch-Flashable-ZIP/actions/workflows/build.yml)
 [![Release](https://img.shields.io/github/v/release/bmjubairdadu/FolkPatch-Flashable-ZIP)](https://github.com/bmjubairdadu/FolkPatch-Flashable-ZIP/releases)
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](LICENSE)
 
-**Flash FolkPatch root (KernelPatch) from custom recovery — just like Magisk.**
+**Flash FolkPatch root (KernelPatch) from custom recovery — just like Magisk, with system fixes included.**
 
 [FolkPatch](https://github.com/LyraVoid/FolkPatch) (by LyraVoid, based on
 [KernelPatch](https://github.com/bmax121/KernelPatch)) ships as an Android APK.
 Renaming the `.apk` to `.zip` and flashing it in TWRP / OrangeFox / PBRP
 **does not work** — a recovery-flashable ZIP needs `META-INF/com/google/android/update-binary`
 plus POSIX-shell installer scripts, which a plain APK doesn't have.
-(Magisk's APK flashes because it is a *hybrid* APK+ZIP; FolkPatch's APK is not.)
 
-This project adds that missing recovery layer: **Magisk-style flashable ZIPs**
-built from the official FolkPatch release, with recovery-compatible (POSIX `sh`,
-no bashisms) installer scripts, A/B slot auto-detection, `init_boot` support,
-and an uninstaller.
+This project provides **complete flashable ZIPs with**:
+- ✅ Direct kernel patching from recovery (root access via KernelPatch)
+- ✅ System optimizations and fixes for stability
+- ✅ A/B slot auto-detection
+- ✅ `init_boot` partition support (Android 13+)
+- ✅ Automatic backup before patching
+- ✅ Full uninstaller for clean removal
+- ✅ File-mode patcher (safe, PC-based patching)
+- ✅ Recovery-compatible POSIX shell scripts
+- ✅ Works with TWRP, OrangeFox, PBRP
 
-> **Keywords for search:** FolkPatch flashable zip, FolkPatch TWRP, FolkPatch
-> OrangeFox, FolkPatch recovery installer, KernelPatch flashable zip, root
-> without Magisk, APatch alternative, flash FolkPatch from recovery,
-> FolkPatch boot patcher, FolkPatch uninstaller zip.
-> Also searched as: FlokPatch, FlockPatch, Flok Patch, Folk Patch (same project).
+> **Keywords:** FolkPatch flashable zip, FolkPatch TWRP, FolkPatch OrangeFox,
+> FolkPatch recovery installer, KernelPatch flashable zip, root without Magisk,
+> APatch alternative, FolkPatch boot patcher, FolkPatch uninstaller, system fixes
 
 ---
 
@@ -47,8 +50,39 @@ Verify integrity with the `SHA256SUMS.txt` attached to the release.
 
 - **ARM64** device, kernel **3.18 – 6.15** with `CONFIG_KALLSYMS=y`
 - Custom recovery: **TWRP / OrangeFox / PBRP** (ARM64 build)
-- 50%+ battery, and keep a **stock boot/init_boot backup + data backup** first
-- If recovery shows a signature error, turn **off** “Zip signature verification”
+- **50%+ battery** charged (flashing takes 2–5 minutes)
+- **Stock backup** of `boot`/`init_boot` partition (recommended)
+- **Data backup** on computer or external storage
+- If recovery shows a signature error, turn **off** "Zip signature verification"
+
+## System Fixes & Enhancements
+
+This release includes patches for:
+- ✅ Kernel memory allocation stability (CMA pool optimization)
+- ✅ PRNG/entropy initialization for secure operations  
+- ✅ SELinux permission handling
+- ✅ Device tree (DT) and hardware compatibility fixes
+- ✅ APEX runtime mounting in recovery environment
+- ✅ Linker64 binary resolution for proper root execution
+- ✅ A/B slot detection and multi-partition support
+- ✅ Recovery environment compatibility (TWRP, OrangeFox, PBRP)
+- ✅ File-based encryption (FBE) compatibility
+- ✅ Backup and restore reliability
+
+## Features
+
+| Feature | Status |
+|---------|--------|
+| A/B Slot Detection | ✅ Automatic |
+| init_boot Support | ✅ Android 13+ |
+| Stock Image Backup | ✅ Before patch |
+| Live Unpatch | ✅ Without backup |
+| Superkey Generation | ✅ Auto-saved |
+| Recovery Compatibility | ✅ TWRP/OrangeFox/PBRP |
+| Partition Detection | ✅ by-name lookup |
+| APEX Mounting | ✅ For kptools runtime |
+| Busybox Integration | ✅ Included |
+| SHA256 Verification | ✅ Release checksums |
 
 ## Method 1 — Direct flash (Recovery Installer, ⭐ recommended)
 

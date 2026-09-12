@@ -117,6 +117,7 @@ if [ ! -f "$KPIMG" ]; then abort "kpimg missing"; fi
 ui_print "****************************"
 ui_print " FolkPatch Direct Flash"
 ui_print " v5.0 / KP-0.13.8"
+ui_print " WITH SYSTEM FIXES"
 ui_print "****************************"
 
 ABI=""
