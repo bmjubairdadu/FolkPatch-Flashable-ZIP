@@ -22,6 +22,7 @@ and an uninstaller.
 > OrangeFox, FolkPatch recovery installer, KernelPatch flashable zip, root
 > without Magisk, APatch alternative, flash FolkPatch from recovery,
 > FolkPatch boot patcher, FolkPatch uninstaller zip.
+> Also searched as: FlokPatch, FlockPatch, Flok Patch, Folk Patch (same project).
 
 ---
 
