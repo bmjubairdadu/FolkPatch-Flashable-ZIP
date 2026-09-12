@@ -1,0 +1,16 @@
+# local build inputs / outputs (binaries are NOT committed)
+FolkPatch.apk
+dist/
+*.zip
+!docs/
+# release drafts
+GPL_BODY.txt
+LICENSE_TMP.txt
+# OS / editors
+Thumbs.db
+Desktop.ini
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*~
