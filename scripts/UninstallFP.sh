@@ -156,17 +156,13 @@ find_part() {
 }
 
 TARGET=""
-TARGET_KIND=""
-T=$(find_part "boot")
-if [ -n "$T" ]; then TARGET="$T"; TARGET_KIND="boot"; else
-  T=$(find_part "vendor_kernel_boot")
-  if [ -n "$T" ]; then TARGET="$T"; TARGET_KIND="vendor_kernel_boot"; else
-    T=$(find_part "init_boot")
-    if [ -n "$T" ]; then TARGET="$T"; TARGET_KIND="init_boot"; fi
-  fi
-fi
-if [ -z "$TARGET" ]; then abort "no boot/init_boot partition found"; fi
-ui_print "- Target: $TARGET_KIND ($TARGET)"
+TARGET_KIND="boot"
+for _n in boot kern-a android_boot kernel bootimg lnx; do
+  T=$(find_part "$_n")
+  if [ -n "$T" ]; then TARGET="$T"; break; fi
+done
+if [ -z "$TARGET" ]; then abort "no BOOT partition found"; fi
+ui_print "- Target: boot ($TARGET)"
 
 # Prefer the backup that matches THIS slot+kind (cross-slot restore = freeze).
 BACKUP=""

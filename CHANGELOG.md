@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented here.
 
+## [v8.0-kp0.13.8] — 2026-09-13 — ONE ZIP for ALL devices (boot-only universal)
+
+### Fixed
+- 🐛 **boot/init_boot confusion sesh:** official niyome kernel SOB device-e
+  `boot`-e thake — purono phone hok ba notun (init_boot thakleo). `init_boot`
+  / `vendor_boot`-e sudhu ramdisk; flash korle root hoy na + brick.
+  Installer ekhon **boot-only**: `boot` na pele abort, `init_boot` kokhonoi
+  chobe na. Ektai ZIP sob device-e cholbe.
+- 🐛 Boot-Patcher ekhon stock `boot.img` chai; `init_boot` file dile loud
+  warning dey.
+- 🐛 Uninstaller-oo boot-only restore.
+
 ## [v7.0-kp0.13.8] — 2026-09-13 — NO-KEY official flow (4.3+ signature-auth)
 
 ### Fixed

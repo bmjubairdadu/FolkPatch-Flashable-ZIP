@@ -12,11 +12,13 @@ Renaming the `.apk` to `.zip` and flashing it in TWRP / OrangeFox / PBRP
 **does not work** — a recovery-flashable ZIP needs `META-INF/com/google/android/update-binary`
 plus POSIX-shell installer scripts, which a plain APK doesn't have.
 
-This project provides **complete flashable ZIPs with**:
+This project provides **one universal flashable ZIP set — works on ALL
+devices** (old boot-only phones AND new boot+init_boot phones):
 - ✅ Direct kernel patching from recovery (root access via KernelPatch)
+- ✅ **Boot-only universal** — official rule: kernel always lives in `boot`;
+  `init_boot` is ramdisk-only and is NEVER flashed (no brick)
 - ✅ System optimizations and fixes for stability
 - ✅ A/B slot auto-detection
-- ✅ `init_boot` partition support (Android 13+)
 - ✅ Automatic backup before patching
 - ✅ Full uninstaller for clean removal
 - ✅ File-mode patcher (safe, PC-based patching)
@@ -33,13 +35,13 @@ This project provides **complete flashable ZIPs with**:
 
 Get the ZIPs from the
 [**Releases page**](https://github.com/bmjubairdadu/FolkPatch-Flashable-ZIP/releases)
-(`v7.0-kp0.13.8`):
+(`v8.0-kp0.13.8`):
 
 | File | What it does |
 |---|---|
-| `FolkPatch-v7.0-kp0.13.8-Recovery-Installer.zip` | ⭐ **Recommended — Direct flash** — patches & flashes `boot` (kernel lives here on old **and** new devices) with `vendor_kernel_boot`/`init_boot` fallback. Easiest, no PC needed. |
-| `FolkPatch-v7.0-kp0.13.8-Boot-Patcher.zip` | **Safe file mode (advanced)** — patches a stock `boot`/`init_boot` image on your sdcard, **never touches partitions**. You then `fastboot flash` the patched image from a PC. |
-| `FolkPatch-v7.0-kp0.13.8-Uninstaller.zip` | Restores the stock backup, or live-unpatches the kernel. |
+| `FolkPatch-v8.0-kp0.13.8-Recovery-Installer.zip` | ⭐ **Recommended — Direct flash** — ONE ZIP for ALL devices: patches & flashes `boot` (kernel lives here on every device, old or new). `init_boot` is NEVER touched. Easiest, no PC needed. |
+| `FolkPatch-v8.0-kp0.13.8-Boot-Patcher.zip` | **Safe file mode (advanced)** — patches a stock `boot.img` file on your sdcard, **never touches partitions**. You then `fastboot flash boot` the patched image from a PC. |
+| `FolkPatch-v8.0-kp0.13.8-Uninstaller.zip` | Restores the stock backup, or live-unpatches the kernel. |
 
 Each ZIP also bundles the `FolkPatch-Manager.apk` (copied to sdcard on install)
 and a `README.txt` (Bangla guide).
@@ -51,7 +53,7 @@ Verify integrity with the `SHA256SUMS.txt` attached to the release.
 - **ARM64** device, kernel **3.18 – 6.15** with `CONFIG_KALLSYMS=y`
 - Custom recovery: **TWRP / OrangeFox / PBRP** (ARM64 build)
 - **50%+ battery** charged (flashing takes 2–5 minutes)
-- **Stock backup** of `boot`/`init_boot` partition (recommended)
+- **Stock backup** of `boot` partition (recommended)
 - **Data backup** on computer or external storage
 - If recovery shows a signature error, turn **off** "Zip signature verification"
 
@@ -74,7 +76,7 @@ This release includes patches for:
 | Feature | Status |
 |---------|--------|
 | A/B Slot Detection | ✅ Automatic |
-| init_boot Support | ✅ Android 13+ |
+| Universal target | ✅ boot-only (all devices) |
 | Stock Image Backup | ✅ Before patch |
 | Live Unpatch | ✅ Without backup |
 | Superkey / password | ❌ Not needed (signature-auth) |
@@ -88,7 +90,7 @@ This release includes patches for:
 
 1. Copy the Installer ZIP (and the APK) to sdcard.
 2. Boot recovery → Install → flash
-   `FolkPatch-v7.0-kp0.13.8-Recovery-Installer.zip`.
+   `FolkPatch-v8.0-kp0.13.8-Recovery-Installer.zip`.
 3. Flash → reboot. **Kono key/superkey lagbe NA** (FolkPatch 4.3+ theke
    official signature-auth — app-e key deoar option nei, thakar kothao na).
 4. Reboot → sdcard theke `FolkPatch-Manager.apk` (**ZIP-er official APK tai**,
@@ -114,19 +116,19 @@ Freeze safety in this build: each A/B slot is patched from **its own** stock
 
 ## Method 2 — Safe (Boot Patcher + fastboot, advanced)
 
-1. Put your **stock** `boot.img` / `init_boot.img` (from your firmware) on
+1. Put your **stock** `boot.img` (from your firmware) on
    sdcard, named:
-   `FolkPatch-stock-boot.img` (or `FolkPatch-stock-init_boot.img`).
-2. Flash `FolkPatch-v7.0-kp0.13.8-Boot-Patcher.zip` from recovery
+   `FolkPatch-stock-boot.img`.
+2. Flash `FolkPatch-v8.0-kp0.13.8-Boot-Patcher.zip` from recovery
    (it does **not** touch any partition).
 3. It writes `FolkPatch-patched-boot.img` to sdcard.
 4. On PC: `fastboot flash boot <file>`
-   (or `fastboot flash init_boot <file>`; on A/B devices flash the current slot).
+   (on A/B devices flash the current slot, or both slots).
 5. Reboot → install Manager APK → verify.
 
 ## Uninstall
 
-Flash `FolkPatch-v7.0-kp0.13.8-Uninstaller.zip`.
+Flash `FolkPatch-v8.0-kp0.13.8-Uninstaller.zip`.
 If a stock backup (`FolkPatch-Backup/stock-*.img`) exists it is restored
 automatically.
 
@@ -135,7 +137,8 @@ automatically.
 - `META-INF/com/google/android/update-binary` — Magisk-style bootstrap:
   picks a writable tmp dir, bootstraps busybox, extracts the payload,
   selects the installer by ZIP name, then `exec`s it.
-- `scripts/InstallFP.sh` — reads the live `boot`/`init_boot` partition,
+- `scripts/InstallFP.sh` — reads the live `boot` partition (boot-only,
+  universal — `init_boot` is NEVER flashed),
   backs it up, `unpack → keyless patch (kptools + kpimg, signature-auth) → repack → flash`.
 - `scripts/PatchOnly.sh` — same pipeline on a stock image file, no flashing.
 - `scripts/UninstallFP.sh` — restores backup or live-unpatches (`kptools -u`).
@@ -151,7 +154,7 @@ official FolkPatch APK and packs the ZIPs:
 
 ```sh
 python tools/build.py
-# outputs dist/FolkPatch-v7.0-kp0.13.8-*.zip + SHA256SUMS.txt
+# outputs dist/FolkPatch-v8.0-kp0.13.8-*.zip + SHA256SUMS.txt
 ```
 
 Pushing a `v*` tag runs the same build in GitHub Actions and attaches the

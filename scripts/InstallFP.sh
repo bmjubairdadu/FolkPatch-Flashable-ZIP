@@ -133,8 +133,8 @@ if [ ! -f "$KPIMG" ]; then abort "kpimg missing"; fi
 
 ui_print "****************************"
 ui_print " FolkPatch FINAL All-in-One"
-ui_print " v7.0 / KP-0.13.8"
-ui_print " official signature-auth, NO KEY needed"
+ui_print " v8.0 / KP-0.13.8"
+ui_print " boot-only universal, NO KEY needed"
 ui_print "****************************"
 
 ABI=""
@@ -210,33 +210,24 @@ find_part() {
   return 1
 }
 
-# KernelPatch patches the KERNEL, which lives in boot - never init_boot.
-# (init_boot holds ramdisk on new devices; patching it = no root + panic/freeze.)
-# So boot is always preferred; init_boot is only a last-resort fallback.
+# OFFICIAL RULE (fp.mysqil.com): FolkPatch always patches the BOOT partition -
+# old device or new, kernel lives in boot. init_boot/vendor_boot hold ramdisk
+# only; patching them = no root + brick. So this ZIP is boot-only everywhere.
 TARGET=""
-TARGET_KIND=""
-T=$(find_part "boot")
-if [ -n "$T" ]; then
-  TARGET="$T"
-  TARGET_KIND="boot"
-  ui_print "- Target: boot ($TARGET)"
-else
-  T=$(find_part "vendor_kernel_boot")
+TARGET_KIND="boot"
+for _n in boot kern-a android_boot kernel bootimg lnx; do
+  T=$(find_part "$_n")
   if [ -n "$T" ]; then
     TARGET="$T"
-    TARGET_KIND="vendor_kernel_boot"
-    ui_print "- Target: vendor_kernel_boot ($TARGET)"
-  else
-    T=$(find_part "init_boot")
-    if [ -n "$T" ]; then
-      TARGET="$T"
-      TARGET_KIND="init_boot"
-      ui_print "- WARNING: only init_boot found (no boot) - unusual, continuing"
-    fi
+    break
   fi
-fi
-if [ -z "$TARGET" ]; then
-  abort "no boot/init_boot partition found (by-name missing in this recovery)"
+done
+if [ -n "$TARGET" ]; then
+  ui_print "- Target: boot ($TARGET)"
+else
+  ui_print "- Found partitions:"
+  ls /dev/block/by-name 2>/dev/null | while IFS= read -r _p || [ -n "$_p" ]; do ui_print "  $_p"; done
+  abort "no BOOT partition found. NEVER flash init_boot (brick!). Use Boot-Patcher ZIP + fastboot instead."
 fi
 
 SKEY=""

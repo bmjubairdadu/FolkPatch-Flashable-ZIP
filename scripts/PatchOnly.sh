@@ -124,26 +124,33 @@ ui_print " FolkPatch Boot Patcher"
 ui_print " (file mode, no auto-flash)"
 ui_print "****************************"
 
-# Kernel lives in boot: prefer boot images first (init_boot = ramdisk only).
+# OFFICIAL RULE: kernel lives in BOOT. init_boot/vendor_boot = ramdisk only.
+# Boot-Patcher still accepts any file, but warns loudly on non-boot images.
 SRC=""
-for f in /sdcard/FolkPatch-stock-boot.img /data/media/0/FolkPatch-stock-boot.img /sdcard/boot.img /sdcard/stock_boot.img /external_sd/boot.img /sdcard/FolkPatch-stock-init_boot.img /sdcard/init_boot.img /sdcard/stock_init_boot.img /external_sd/init_boot.img; do
+for f in /sdcard/FolkPatch-stock-boot.img /data/media/0/FolkPatch-stock-boot.img /sdcard/boot.img /sdcard/stock_boot.img /external_sd/boot.img /sdcard/stock-boot.img; do
   if [ -s "$f" ]; then SRC="$f"; break; fi
 done
 if [ -z "$SRC" ]; then
-  ui_print "- Put your stock image on sdcard first, named:"
-  ui_print "  FolkPatch-stock-boot.img  (or init_boot)"
-  abort "no stock boot/init_boot img found on sdcard"
+  for f in /sdcard/*.img /data/media/0/*.img /external_sd/*.img; do
+    if [ -s "$f" ]; then SRC="$f"; break; fi
+  done
+fi
+if [ -z "$SRC" ]; then
+  ui_print "- Put your STOCK boot.img on sdcard first, named:"
+  ui_print "  FolkPatch-stock-boot.img"
+  abort "no stock boot img found on sdcard"
 fi
 ui_print "- Source: $SRC"
 
 case "$SRC" in
-  *init_boot*) KIND="init_boot" ;;
+  *init_boot*|*vendor_boot*|*vendor_kernel_boot*)
+    KIND="boot"
+    ui_print "- WARNING: '$SRC' looks like init_boot/vendor_boot (RAMDISK ONLY)."
+    ui_print "- Official rule: kernel lives in BOOT. This file likely has NO kernel."
+    ui_print "- Continuing to try, but use stock boot.img if this fails."
+    ;;
   *) KIND="boot" ;;
 esac
-if [ "$KIND" = "init_boot" ]; then
-  ui_print "- NOTE: init_boot holds ramdisk, kernel patch needs boot."
-  ui_print "- If root does not activate, redo with stock boot.img."
-fi
 
 # FolkPatch 4.3+: official auth = SIGNATURE, no password/key needed.
 ui_print "- Auth: official signature mode (no superkey needed)"
