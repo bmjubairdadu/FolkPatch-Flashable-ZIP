@@ -234,6 +234,13 @@ if [ -n "$BACKUP" ]; then
     fi
   fi
   sync 2>/dev/null
+  # Daemon cleanup: kernel stock hole /data/adb/apd rakhle "ghost root"
+  # dekhate pare - official layout (/data/adb/ap, apd, fp) sorano hoy.
+  # Modules (/data/adb/modules) chowa hoy NA.
+  for _d in /data/adb/apd /data/adb/ap /data/adb/fp; do
+    if [ -e "$_d" ]; then rm -rf "$_d" 2>/dev/null; fi
+  done
+  ui_print "- Daemon removed (/data/adb/apd, ap, fp)."
   ui_print "****************************"
   ui_print " Stock restored. Reboot - device is unrooted."
   ui_print "****************************"

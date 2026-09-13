@@ -2,6 +2,26 @@
 
 All notable changes to this project are documented here.
 
+## [v10.0-kp0.13.8] — 2026-09-13 — INSTANT ROOT (kernel + daemon, app rule)
+
+### Fixed
+- 🐛 **Ager sob ZIP keno root dito na (asol karon):** ZIP sudhu kernel
+  patch korto (`patched=true`), kintu root-er second half — userspace daemon
+  `/data/adb/apd` — recovery-te bosato na. `kpimg` boot-e
+  `exec /data/adb/apd ...` chalate giye file peto na, tai app bolto
+  "root unavailable". Ekhon installer recovery-tei official layout-e bosay:
+  `/data/adb/apd` (APK `libapd.so`), `/data/adb/ap/bin/` (busybox, kptools,
+  resetprop, apd symlink), `/data/adb/fp/bin/fpd` (APK `Service/fpd`),
+  `su_path` + `ori.img` + `restorecon`. Flash = **INSTANT ROOT**:
+  reboot -> Manager APK install -> Installed/Active, ditiyo patch lagbe na.
+- 🐛 `/data` encrypted/locked thakle daemon best-effort skip (kernel ready
+  thake); reboot-er por app prothom open-e one-tap-e `apd` bosiye ney.
+- 🐛 Uninstaller ekhon kernel restore-er sathe daemon-oo soray
+  (`/data/adb/apd`, `/data/adb/ap`, `/data/adb/fp`) — ghost-root thake na.
+  Modules (`/data/adb/modules`) chowa hoy na.
+- 🐛 ZIP-e ekhon `assets/apd` + `assets/fpd` + `assets/resetprop` bundled
+  (APK theke); fallback hisebe recovery-te APK theke extract-oo hoy.
+
 ## [v9.0-kp0.13.8] — 2026-09-13 — REAL superkey (root-unavailable fix)
 
 ### Fixed

@@ -133,13 +133,13 @@ if [ ! -f "$KPIMG" ]; then abort "kpimg missing"; fi
 
 ui_print "****************************"
 ui_print " FolkPatch FINAL All-in-One"
-ui_print " v9.0 / KP-0.13.8 STABLE"
-ui_print " boot-only universal, NO KEY needed"
+ui_print " v10.0 / KP-0.13.8 STABLE"
+ui_print " boot-only universal, FLASH = INSTANT ROOT"
 ui_print "****************************"
 ui_print "- JODI screen-e 'superkey' / '000' dekho:"
-ui_print "- TUMI VUL (purono v5/v6) ZIP flash korecho!"
-ui_print "- v8.0-te kono superkey screen-e ASE NA - keyless."
-ui_print "- v8.0 Recovery-Installer NOTUN kore download kore flash koro."
+ui_print "- TUMI VUL (purono v5/v6/v8-keyless) ZIP flash korecho!"
+ui_print "- v10.0 Recovery-Installer NOTUN kore download kore flash koro."
+ui_print "- Key: kernel-e REAL superkey set hoy (app-e ENTRY lagbe na)."
 
 ABI=""
 if command -v getprop >/dev/null 2>&1; then
@@ -567,10 +567,95 @@ if [ -n "$INACTIVE_FLASHED" ] && [ -f "$WORK/new-boot-inactive.img" ]; then
 fi
 sync 2>/dev/null
 
+# Userspace daemon = root-er second half (app rule, recovery-tei).
+# Kernel (kpimg) boot-e `exec /data/adb/apd ...` chalabe - /data/adb/apd
+# na thakle patched=true thakleo "root unavailable" (ager bug).
+# Tai recovery-tei official layout-e apd+fpd+bins bosano hoy: flash =
+# INSTANT ROOT. /data encrypted/locked thakle best-effort: kernel ready,
+# reboot-er por app prothom open-e apd bosiye nebe (one-tap).
+ui_print "- Installing root daemon (instant-root, app rule) ..."
+APD_SRC=""
+for _a in "$WORK/assets/apd" "$WORK/lib/arm64-v8a/libapd.so"; do
+  if [ -s "$_a" ]; then APD_SRC="$_a"; break; fi
+done
+FPD_SRC=""
+for _f in "$WORK/assets/fpd" "$WORK/assets/Service/fpd"; do
+  if [ -s "$_f" ]; then FPD_SRC="$_f"; break; fi
+done
+BUSYB_SRC=""
+for _b in "$WORK/busybox" "$WORK/lib/arm64-v8a/libbusybox.so"; do
+  if [ -s "$_b" ]; then BUSYB_SRC="$_b"; break; fi
+done
+KPTB_SRC="$KPTOOLS"
+RESETP_SRC=""
+for _r in "$WORK/assets/resetprop" "$WORK/lib/arm64-v8a/libresetprop.so"; do
+  if [ -s "$_r" ]; then RESETP_SRC="$_r"; break; fi
+done
+need_apk_extract=0
+if [ -z "$APD_SRC" ]; then need_apk_extract=1; fi
+if [ -z "$FPD_SRC" ]; then need_apk_extract=1; fi
+if [ -z "$RESETP_SRC" ]; then need_apk_extract=1; fi
+if [ "$need_apk_extract" = "1" ] && [ -s "$WORK/FolkPatch.apk" ]; then
+  mkdir -p "$WORK/apklib" 2>/dev/null
+  if [ "$BB_OK" = "1" ]; then
+    "$BB" unzip -o -q "$WORK/FolkPatch.apk" "lib/arm64-v8a/libapd.so" "lib/arm64-v8a/libresetprop.so" "assets/Service/fpd" -d "$WORK/apklib" 2>/dev/null
+  else
+    unzip -o -q "$WORK/FolkPatch.apk" "lib/arm64-v8a/libapd.so" "lib/arm64-v8a/libresetprop.so" "assets/Service/fpd" -d "$WORK/apklib" 2>/dev/null
+  fi
+  if [ -z "$APD_SRC" ] && [ -s "$WORK/apklib/lib/arm64-v8a/libapd.so" ]; then APD_SRC="$WORK/apklib/lib/arm64-v8a/libapd.so"; fi
+  if [ -z "$RESETP_SRC" ] && [ -s "$WORK/apklib/lib/arm64-v8a/libresetprop.so" ]; then RESETP_SRC="$WORK/apklib/lib/arm64-v8a/libresetprop.so"; fi
+  if [ -z "$FPD_SRC" ] && [ -s "$WORK/apklib/assets/Service/fpd" ]; then FPD_SRC="$WORK/apklib/assets/Service/fpd"; fi
+fi
+if [ -z "$APD_SRC" ]; then ui_print "- WARNING: apd source missing (APK extract failed?) - daemon skip"; fi
+mkdir -p /data/adb/ap/bin /data/adb/ap/log "/data/adb/ap/kpm" /data/adb/fp/bin /data/adb/fp/pathhide /data/adb/post-fs-data.d 2>/dev/null
+if [ ! -d /data/adb ]; then
+  mount /data 2>/dev/null
+  mkdir -p /data/adb/ap/bin /data/adb/ap/log "/data/adb/ap/kpm" /data/adb/fp/bin /data/adb/fp/pathhide /data/adb/post-fs-data.d 2>/dev/null
+fi
+DAEMON_OK=0
+if [ -d /data/adb ]; then
+  if [ -n "$APD_SRC" ]; then
+    run_cp -f "$APD_SRC" /data/adb/apd 2>/dev/null
+    chmod 755 /data/adb/apd 2>/dev/null
+    if [ "$BB_OK" = "1" ]; then "$BB" chmod 755 /data/adb/apd 2>/dev/null; fi
+  fi
+  if [ -n "$BUSYB_SRC" ]; then run_cp -f "$BUSYB_SRC" /data/adb/ap/bin/busybox 2>/dev/null; fi
+  if [ -n "$KPTB_SRC" ]; then run_cp -f "$KPTB_SRC" /data/adb/ap/bin/kptools 2>/dev/null; fi
+  if [ -n "$RESETP_SRC" ]; then run_cp -f "$RESETP_SRC" /data/adb/ap/bin/resetprop 2>/dev/null; fi
+  if [ -n "$FPD_SRC" ]; then
+    run_cp -f "$FPD_SRC" /data/adb/fp/bin/fpd 2>/dev/null
+    chmod 755 /data/adb/fp/bin/fpd 2>/dev/null
+    if [ "$BB_OK" = "1" ]; then "$BB" chmod 755 /data/adb/fp/bin/fpd 2>/dev/null; fi
+  fi
+  chmod 755 /data/adb/ap/bin/busybox /data/adb/ap/bin/kptools /data/adb/ap/bin/resetprop 2>/dev/null
+  ln -sf /data/adb/apd /data/adb/ap/bin/apd 2>/dev/null
+  if [ ! -s /data/adb/ap/su_path ]; then echo "/system/bin/su" > /data/adb/ap/su_path 2>/dev/null; fi
+  touch /data/adb/ap/package_config 2>/dev/null
+  touch /data/adb/ap/version 2>/dev/null
+  if [ -s "$BKDIR/stock-$TARGET_KIND$SLOT.img" ]; then
+    run_cp -f "$BKDIR/stock-$TARGET_KIND$SLOT.img" /data/adb/ap/ori.img 2>/dev/null
+  fi
+  if command -v restorecon >/dev/null 2>&1; then
+    restorecon /data/adb/apd 2>/dev/null
+    restorecon -R /data/adb/ap/ 2>/dev/null
+    restorecon /data/adb/fp/bin/fpd 2>/dev/null
+  fi
+  if [ -s /data/adb/apd ]; then
+    DAEMON_OK=1
+    ui_print "- Daemon OK: /data/adb/apd + bins + fpd installed"
+  else
+    ui_print "- WARNING: /data not writable (encrypted?) - daemon skipped"
+    ui_print "- Kernel patched ache; reboot-er por app khulle one-tap-e apd bosbe."
+  fi
+else
+  ui_print "- WARNING: /data mount hoy ni - daemon skipped, kernel patched ache."
+  ui_print "- Reboot-er por app khulle one-tap-e apd bosbe."
+fi
+
 # Stage official manager APK on sdcard (signature-auth: this exact APK only).
-# Recovery has no package manager, so first install is manual - but kernel is
-# already patched keyless, so after reboot: install APK -> app auto-verifies
-# official signature -> Installed/Active. No key anywhere.
+# Recovery has no package manager, so APK install is manual - but kernel +
+# daemon already ready, so after reboot: install APK -> Installed/Active.
+# Key kernel-e set; app-e ENTRY lagbe na.
 if [ -f "$WORK/FolkPatch.apk" ]; then
   for d in /sdcard /data/media/0 /external_sd; do
     if [ -d "$d" ]; then
@@ -602,10 +687,16 @@ ui_print "****************************"
 ui_print " FolkPatch installed! Auto-root active."
 ui_print " Key: $SKEY (kernel-e set; app-e ENTRY lagbe na - signature-auth)."
 ui_print " Stock backup: $BKDIR/stock-$TARGET_KIND$SLOT.img"
+if [ "$DAEMON_OK" = "1" ]; then
+  ui_print " Daemon: /data/adb/apd INSTALLED - reboot = INSTANT ROOT."
+else
+  ui_print " Daemon: /data locked chilo - reboot-er por app khulle one-tap."
+fi
 ui_print " BADHOTAMULOK:"
 ui_print " 1. Reboot -> sdcard-er FolkPatch-Manager.apk INSTALL koro"
 ui_print "    (ZIP-er sathe thaka official APK tai - onno APK noy)."
 ui_print " 2. App kholo -> Installed/Active dekhabe, key chaibe NA."
+ui_print "    Superuser chaile Allow dio (prothom bar)."
 ui_print " 3. Root Checker diye verify koro."
 ui_print " Bootloop/freeze? Flash Uninstaller ZIP or restore stock img."
 ui_print "****************************"

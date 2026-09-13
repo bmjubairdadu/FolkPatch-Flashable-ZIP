@@ -35,13 +35,13 @@ devices** (old boot-only phones AND new boot+init_boot phones):
 
 Get the ZIPs from the
 [**Releases page**](https://github.com/bmjubairdadu/FolkPatch-Flashable-ZIP/releases)
-(`v9.0-kp0.13.8`):
+(`v10.0-kp0.13.8`):
 
 | File | What it does |
 |---|---|
-| `FolkPatch-v9.0-kp0.13.8-Recovery-Installer.zip` | ⭐ **Recommended — Direct flash** — ONE ZIP for ALL devices: patches & flashes `boot` (kernel lives here on every device, old or new). `init_boot` is NEVER touched. Easiest, no PC needed. |
-| `FolkPatch-v9.0-kp0.13.8-Boot-Patcher.zip` | **Safe file mode (advanced)** — patches a stock `boot.img` file on your sdcard, **never touches partitions**. You then `fastboot flash boot` the patched image from a PC. |
-| `FolkPatch-v9.0-kp0.13.8-Uninstaller.zip` | Restores the stock backup, or live-unpatches the kernel. |
+| `FolkPatch-v10.0-kp0.13.8-Recovery-Installer.zip` | ⭐ **Recommended — Direct flash = INSTANT ROOT** — ONE ZIP for ALL devices: patches & flashes `boot` (kernel lives here on every device, old or new) with REAL superkey **+ installs `/data/adb/apd` daemon in recovery** (app rule). Reboot -> install Manager APK -> Installed/Active. `init_boot` is NEVER touched. Easiest, no PC needed. |
+| `FolkPatch-v10.0-kp0.13.8-Boot-Patcher.zip` | **Safe file mode (advanced)** — patches a stock `boot.img` file on your sdcard, **never touches partitions**. You then `fastboot flash boot` the patched image from a PC. |
+| `FolkPatch-v10.0-kp0.13.8-Uninstaller.zip` | Restores the stock backup, removes daemon, or live-unpatches the kernel. |
 
 Each ZIP also bundles the `FolkPatch-Manager.apk` (copied to sdcard on install)
 and a `README.txt` (Bangla guide).
@@ -90,12 +90,13 @@ This release includes patches for:
 
 1. Copy the Installer ZIP (and the APK) to sdcard.
 2. Boot recovery → Install → flash
-   `FolkPatch-v9.0-kp0.13.8-Recovery-Installer.zip`.
-3. Flash → reboot. Screen-e **superkey** (`ApXXXXXXXX`) dekhabe — note koro
-   (kernel-e set hoyeche; **app-e entry deoar option nei**, app signature
-   diye auto-verify kore).
+   `FolkPatch-v10.0-kp0.13.8-Recovery-Installer.zip`.
+3. Flash → reboot. Screen-e **superkey** (`ApXXXXXXXX`) + **Daemon OK**
+   dekhabe — kernel patched + `/data/adb/apd` installed = INSTANT ROOT
+   (**app-e key entry deoar option nei**, app signature diye auto-verify kore).
 4. Reboot → sdcard theke `FolkPatch-Manager.apk` (**ZIP-er official APK tai**,
    onno APK noy) install koro → app kholo → Installed/Active dekhabe.
+   Ditiyo patch lagbe na — Superuser chaile Allow dio.
 5. App **already installed**? Purono app uninstall kore ZIP-er official APK
    install koro (signature na mille auth hobe na).
 6. Bootloop/freeze? Flash the **Uninstaller ZIP** or restore your stock image.
@@ -120,7 +121,7 @@ Freeze safety in this build: each A/B slot is patched from **its own** stock
 1. Put your **stock** `boot.img` (from your firmware) on
    sdcard, named:
    `FolkPatch-stock-boot.img`.
-2. Flash `FolkPatch-v9.0-kp0.13.8-Boot-Patcher.zip` from recovery
+2. Flash `FolkPatch-v10.0-kp0.13.8-Boot-Patcher.zip` from recovery
    (it does **not** touch any partition).
 3. It writes `FolkPatch-patched-boot.img` to sdcard.
 4. On PC: `fastboot flash boot <file>`
@@ -129,7 +130,7 @@ Freeze safety in this build: each A/B slot is patched from **its own** stock
 
 ## Uninstall
 
-Flash `FolkPatch-v9.0-kp0.13.8-Uninstaller.zip`.
+Flash `FolkPatch-v10.0-kp0.13.8-Uninstaller.zip`.
 If a stock backup (`FolkPatch-Backup/stock-*.img`) exists it is restored
 automatically.
 
@@ -140,9 +141,10 @@ automatically.
   selects the installer by ZIP name, then `exec`s it.
 - `scripts/InstallFP.sh` — reads the live `boot` partition (boot-only,
   universal — `init_boot` is NEVER flashed),
-  backs it up, `unpack → REAL-key patch (kptools -S, boot_patch.sh rule) → repack → flash`.
+  backs it up, `unpack → REAL-key patch (kptools -S, boot_patch.sh rule) → repack → flash`,
+  then installs the userspace daemon in recovery (`/data/adb/apd` + bins + `fpd`, app rule) = INSTANT ROOT.
 - `scripts/PatchOnly.sh` — same pipeline on a stock image file, no flashing.
-- `scripts/UninstallFP.sh` — restores backup or live-unpatches (`kptools -u`).
+- `scripts/UninstallFP.sh` — restores backup or live-unpatches (`kptools -u`), plus daemon cleanup.
 - Recovery has no Android runtime (`/system/bin/linker64` is a dangling
   symlink because `/apex` isn't mounted), so the scripts mount the real
   `system` + `apex` and run the `kptools` binary directly with
@@ -155,7 +157,7 @@ official FolkPatch APK and packs the ZIPs:
 
 ```sh
 python tools/build.py
-# outputs dist/FolkPatch-v9.0-kp0.13.8-*.zip + SHA256SUMS.txt
+# outputs dist/FolkPatch-v10.0-kp0.13.8-*.zip + SHA256SUMS.txt
 ```
 
 Pushing a `v*` tag runs the same build in GitHub Actions and attaches the

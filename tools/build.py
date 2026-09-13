@@ -42,7 +42,7 @@ def w(z, name, data, mode=0o644):
     z.writestr(zi, data)
 
 
-def build(outname, script_name, script_data, ub, us, rd, bb, kt, kp, apk):
+def build(outname, script_name, script_data, ub, us, rd, bb, kt, kp, apk, extra=None):
     out = os.path.join(args.out, outname)
     z = zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED, compresslevel=9)
     zi = zipfile.ZipInfo("META-INF/com/google/android/update-binary")
@@ -57,6 +57,8 @@ def build(outname, script_name, script_data, ub, us, rd, bb, kt, kp, apk):
     w(z, "lib/arm64-v8a/libbusybox.so", bb, 0o755)
     w(z, "lib/arm64-v8a/libkptools.so", kt, 0o755)
     w(z, "assets/kpimg", kp, 0o755)
+    for name, data in (extra or []):
+        w(z, name, data, 0o755)
     w(z, "assets/" + script_name, script_data, 0o755)
     w(z, "FolkPatch.apk", apk, 0o644)
     w(z, "README.txt", rd, 0o644)
@@ -120,14 +122,37 @@ if __name__ == "__main__":
     bb = za.read("lib/arm64-v8a/libbusybox.so")
     kt = za.read("lib/arm64-v8a/libkptools.so")
     kp = za.read("assets/kpimg")
+    # Instant-root daemon files (app rule): libapd.so -> /data/adb/apd,
+    # Service/fpd -> /data/adb/fp/bin/fpd, resetprop -> /data/adb/ap/bin/.
+    try:
+        apd = za.read("lib/arm64-v8a/libapd.so")
+    except KeyError:
+        apd = b""
+    try:
+        fpd = za.read("assets/Service/fpd")
+    except KeyError:
+        fpd = b""
+    try:
+        rp = za.read("lib/arm64-v8a/libresetprop.so")
+    except KeyError:
+        rp = b""
     za.close()
+    extra = []
+    if apd:
+        extra.append(("assets/apd", apd))
+    if fpd:
+        extra.append(("assets/fpd", fpd))
+    if rp:
+        extra.append(("assets/resetprop", rp))
+    if not apd:
+        print("WARNING: libapd.so missing in APK - instant-root daemon unavailable")
     with open(apk_path, "rb") as f:
         apk = f.read()
 
     os.makedirs(args.out, exist_ok=True)
     outs = []
-    outs.append(build("FolkPatch-%s-Recovery-Installer.zip" % tag, "InstallFP.sh", inst, ub, us, rd, bb, kt, kp, apk))
-    outs.append(build("FolkPatch-%s-Boot-Patcher.zip" % tag, "PatchOnly.sh", patch, ub, us, rd, bb, kt, kp, apk))
+    outs.append(build("FolkPatch-%s-Recovery-Installer.zip" % tag, "InstallFP.sh", inst, ub, us, rd, bb, kt, kp, apk, extra))
+    outs.append(build("FolkPatch-%s-Boot-Patcher.zip" % tag, "PatchOnly.sh", patch, ub, us, rd, bb, kt, kp, apk, extra))
     outs.append(build("FolkPatch-%s-Uninstaller.zip" % tag, "UninstallFP.sh", un, ub, us, rd, bb, kt, kp, apk))
 
     with open(os.path.join(args.out, "SHA256SUMS.txt"), "w") as f:
