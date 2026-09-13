@@ -61,10 +61,13 @@ def build(outname, script_name, script_data, ub, us, rd, bb, kt, kp, apk, extra=
         w(z, name, data, 0o755)
     w(z, "assets/" + script_name, script_data, 0o755)
     # Also include assets folder contents (apd, fpd, resetprop, etc.)
+    # Skip the script file itself since it's already added above.
     assets_dir = os.path.join(ROOT, "assets")
     if os.path.isdir(assets_dir):
         for root, dirs, files in os.walk(assets_dir):
             for fname in files:
+                if fname == script_name:
+                    continue  # already added as assets/<script_name>
                 fpath = os.path.join(root, fname)
                 arcname = os.path.relpath(fpath, ROOT)
                 with open(fpath, "rb") as f:
@@ -113,9 +116,9 @@ if __name__ == "__main__":
 
     ub = lf(os.path.join(ROOT, "META-INF", "com", "google", "android", "update-binary"))
     us = lf(os.path.join(ROOT, "META-INF", "com", "google", "android", "updater-script"))
-    inst = lf(os.path.join(ROOT, "scripts", "InstallFP.sh"))
-    patch = lf(os.path.join(ROOT, "scripts", "PatchOnly.sh"))
-    un = lf(os.path.join(ROOT, "scripts", "UninstallFP.sh"))
+    inst = lf(os.path.join(ROOT, "assets", "InstallFP.sh"))
+    patch = lf(os.path.join(ROOT, "assets", "PatchOnly.sh"))
+    un = lf(os.path.join(ROOT, "assets", "UninstallFP.sh"))
 
     rd_lines = [
         "FolkPatch v%s (KP-%s) - Magisk-style Recovery ZIPs" % (args.version, args.kp),
