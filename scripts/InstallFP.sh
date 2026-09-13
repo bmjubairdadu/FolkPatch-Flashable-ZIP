@@ -530,10 +530,10 @@ if [ -n "$INACTIVE_FLASHED" ] && [ -f "$WORK/new-boot-inactive.img" ]; then
 fi
 sync 2>/dev/null
 
-# Stage manager APK + key where the app/upgrade flow expects them.
+# Stage official manager APK on sdcard (signature-auth: this exact APK only).
 # Recovery has no package manager, so first install is manual - but kernel is
-# already patched, so after reboot: install APK -> enter superkey once ->
-# app shows Installed/Active -> later upgrades keep working.
+# already patched keyless, so after reboot: install APK -> app auto-verifies
+# official signature -> Installed/Active. No key anywhere.
 if [ -f "$WORK/FolkPatch.apk" ]; then
   for d in /sdcard /data/media/0 /external_sd; do
     if [ -d "$d" ]; then
