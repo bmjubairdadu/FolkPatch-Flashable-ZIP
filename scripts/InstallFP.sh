@@ -133,9 +133,13 @@ if [ ! -f "$KPIMG" ]; then abort "kpimg missing"; fi
 
 ui_print "****************************"
 ui_print " FolkPatch FINAL All-in-One"
-ui_print " v8.0 / KP-0.13.8"
+ui_print " v8.0 / KP-0.13.8 STABLE"
 ui_print " boot-only universal, NO KEY needed"
 ui_print "****************************"
+ui_print "- JODI screen-e 'superkey' / '000' dekho:"
+ui_print "- TUMI VUL (purono v5/v6) ZIP flash korecho!"
+ui_print "- v8.0-te kono superkey screen-e ASE NA - keyless."
+ui_print "- v8.0 Recovery-Installer NOTUN kore download kore flash koro."
 
 ABI=""
 if command -v getprop >/dev/null 2>&1; then
