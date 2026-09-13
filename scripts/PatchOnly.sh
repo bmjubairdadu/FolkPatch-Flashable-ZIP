@@ -152,8 +152,26 @@ case "$SRC" in
   *) KIND="boot" ;;
 esac
 
-# FolkPatch 4.3+: official auth = SIGNATURE, no password/key needed.
-ui_print "- Auth: official signature mode (no superkey needed)"
+# Official: kernel gets REAL superkey (keyless = app says unavailable).
+# App needs NO key entry (signature-auth) - key below is for kernel/apd.
+SKEY=""
+for d in /sdcard /data/media/0 /data/media /external_sd; do
+  if [ -f "$d/FolkPatch-key.txt" ]; then
+    SKEY=$(cat "$d/FolkPatch-key.txt" 2>/dev/null | head -n 1 | tr -d ' \t\r\n')
+    if [ -n "$SKEY" ]; then
+      case "$SKEY" in
+        Ap*) break ;;
+        *) SKEY="" ;;
+      esac
+    fi
+  fi
+done
+if [ -z "$SKEY" ]; then
+  R=$(cat /proc/sys/kernel/random/uuid 2>/dev/null | cut -d- -f1 | tr -d ' \t\r\n')
+  if [ -z "$R" ]; then R="00000000"; fi
+  SKEY="Ap$R"
+fi
+ui_print "- Superkey for kernel: $SKEY (app-e entry lagbe na)"
 
 OUTDIR=""
 for d in /sdcard /data/media/0 /external_sd; do
@@ -176,17 +194,32 @@ if kp_run -i kernel -l 2>/dev/null | run_grep -qi "patched=true"; then
   abort "source image already patched - use a STOCK boot.img"
 fi
 if [ "$BB_OK" = "1" ]; then "$BB" mv kernel kernel-origin 2>/dev/null || abort "cannot stage kernel"; else mv kernel kernel-origin 2>/dev/null || abort "cannot stage kernel"; fi
-ui_print "- Official flow: KEYLESS patch, signature-auth (FolkPatch 4.3+) ..."
-kp_run -p -i kernel-origin -k "$KPIMG" -o kernel >"$WORK/patch.log" 2>&1
+ui_print "- Official flow: REAL superkey via -S (boot_patch.sh rule) ..."
+kp_run -p -i kernel-origin -S "$SKEY" -k "$KPIMG" -o kernel >"$WORK/patch.log" 2>&1
 RC=$?
+if [ "$RC" -ne 0 ]; then
+  kp_run -p -i kernel-origin -s "$SKEY" -k "$KPIMG" -o kernel >"$WORK/patch.log" 2>&1
+  RC=$?
+fi
+if [ "$RC" -ne 0 ]; then
+  kp_run -p -i kernel-origin -s "$SKEY" -S "$SKEY" -k "$KPIMG" -o kernel >"$WORK/patch.log" 2>&1
+  RC=$?
+fi
 print_file "$WORK/patch.log"
 if [ "$RC" -ne 0 ]; then abort "patch failed ($RC)"; fi
 ui_print "- Verifying ..."
 kp_run -i kernel -l >"$WORK/verify.log" 2>&1
 print_file "$WORK/verify.log"
 if run_grep -qi "patched=false" "$WORK/verify.log"; then abort "verify failed (patched=false)"; fi
+_VL=$(run_grep -i "root_superkey" "$WORK/verify.log" 2>/dev/null | head -n 1)
+if [ -n "$_VL" ]; then
+  ui_print "- $_VL"
+  case "$_VL" in
+    *000000000000*) abort "root_superkey ZEROED - keyless bug, app will say unavailable. Send log!" ;;
+  esac
+fi
 if run_grep -qi "patched=true" "$WORK/verify.log"; then
-  ui_print "- File patched=true. Flash it, then official Manager APK install."
+  ui_print "- File patched=true with REAL key. Flash it, official APK install."
 fi
 if ! kp_run -i kernel-origin -f 2>/dev/null | run_grep -q "CONFIG_KALLSYMS_ALL=y"; then
   ui_print "- WARNING: CONFIG_KALLSYMS_ALL off; keep stock backup safe."
@@ -197,7 +230,7 @@ if [ ! -f "$WORK/new-boot.img" ]; then abort "new-boot.img missing"; fi
 
 OUT="$OUTDIR/FolkPatch-patched-$KIND.img"
 if [ "$BB_OK" = "1" ]; then "$BB" cp -f "$WORK/new-boot.img" "$OUT" 2>/dev/null || abort "cannot write $OUT"; else cp -f "$WORK/new-boot.img" "$OUT" 2>/dev/null || abort "cannot write $OUT"; fi
-rm -f "$OUTDIR/FolkPatch-key.txt" 2>/dev/null
+echo "$SKEY" > "$OUTDIR/FolkPatch-key.txt" 2>/dev/null
 mkdir -p "$OUTDIR/Download/FolkPatch/BootBackups" 2>/dev/null
 run_cp -f "$SRC" "$OUTDIR/Download/FolkPatch/BootBackups/" 2>/dev/null
 if [ -f "$WORK/FolkPatch.apk" ]; then
@@ -210,7 +243,7 @@ if [ -n "$OLD_LD_CONFIG" ]; then export LD_CONFIG_FILE="$OLD_LD_CONFIG"; fi
 ui_print "****************************"
 ui_print " Patched image ready:"
 ui_print " $OUT"
-ui_print " NO KEY NEEDED (official signature-auth)."
+ui_print " Key: $SKEY (kernel-e; app-e entry lagbe na)."
 ui_print " Flash on PC: fastboot flash $KIND $OUT"
 ui_print " Reboot, official Manager APK install, no key entry."
 ui_print "****************************"

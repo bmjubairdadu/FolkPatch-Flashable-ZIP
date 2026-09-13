@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented here.
 
+## [v9.0-kp0.13.8] — 2026-09-13 — REAL superkey (root-unavailable fix)
+
+### Fixed
+- 🐛 **\"root unavailable\" + superkey-000 asol karon:** tomar log-e
+  `root_superkey=0000...zeroed` — keyless patch-e `apd`/`su` auth more,
+  tai `patched=true` thakleo app root pay na. Ekhon kernel-e abar REAL
+  superkey (`-S`, official `boot_patch.sh` rule) set hoy.
+- 🐛 Key verify: `root_superkey` zeroed thakle installer ekhon abort kore
+  (age sobuj signal dito).
+- 🐛 App-e key **entry** option nei (signature-auth) — key sudhu kernel/apd-r
+  jonno, screen-e dekhay + `FolkPatch-key.txt`-e save thake.
+
 ## [v8.0-kp0.13.8] — 2026-09-13 — ONE ZIP for ALL devices (boot-only universal)
 
 ### Fixed

@@ -35,13 +35,13 @@ devices** (old boot-only phones AND new boot+init_boot phones):
 
 Get the ZIPs from the
 [**Releases page**](https://github.com/bmjubairdadu/FolkPatch-Flashable-ZIP/releases)
-(`v8.0-kp0.13.8`):
+(`v9.0-kp0.13.8`):
 
 | File | What it does |
 |---|---|
-| `FolkPatch-v8.0-kp0.13.8-Recovery-Installer.zip` | ⭐ **Recommended — Direct flash** — ONE ZIP for ALL devices: patches & flashes `boot` (kernel lives here on every device, old or new). `init_boot` is NEVER touched. Easiest, no PC needed. |
-| `FolkPatch-v8.0-kp0.13.8-Boot-Patcher.zip` | **Safe file mode (advanced)** — patches a stock `boot.img` file on your sdcard, **never touches partitions**. You then `fastboot flash boot` the patched image from a PC. |
-| `FolkPatch-v8.0-kp0.13.8-Uninstaller.zip` | Restores the stock backup, or live-unpatches the kernel. |
+| `FolkPatch-v9.0-kp0.13.8-Recovery-Installer.zip` | ⭐ **Recommended — Direct flash** — ONE ZIP for ALL devices: patches & flashes `boot` (kernel lives here on every device, old or new). `init_boot` is NEVER touched. Easiest, no PC needed. |
+| `FolkPatch-v9.0-kp0.13.8-Boot-Patcher.zip` | **Safe file mode (advanced)** — patches a stock `boot.img` file on your sdcard, **never touches partitions**. You then `fastboot flash boot` the patched image from a PC. |
+| `FolkPatch-v9.0-kp0.13.8-Uninstaller.zip` | Restores the stock backup, or live-unpatches the kernel. |
 
 Each ZIP also bundles the `FolkPatch-Manager.apk` (copied to sdcard on install)
 and a `README.txt` (Bangla guide).
@@ -79,7 +79,7 @@ This release includes patches for:
 | Universal target | ✅ boot-only (all devices) |
 | Stock Image Backup | ✅ Before patch |
 | Live Unpatch | ✅ Without backup |
-| Superkey / password | ❌ Not needed (signature-auth) |
+| Superkey in kernel | ✅ Real key set (apd auth) |
 | Recovery Compatibility | ✅ TWRP/OrangeFox/PBRP |
 | Partition Detection | ✅ by-name lookup |
 | APEX Mounting | ✅ For kptools runtime |
@@ -90,9 +90,10 @@ This release includes patches for:
 
 1. Copy the Installer ZIP (and the APK) to sdcard.
 2. Boot recovery → Install → flash
-   `FolkPatch-v8.0-kp0.13.8-Recovery-Installer.zip`.
-3. Flash → reboot. **Kono key/superkey lagbe NA** (FolkPatch 4.3+ theke
-   official signature-auth — app-e key deoar option nei, thakar kothao na).
+   `FolkPatch-v9.0-kp0.13.8-Recovery-Installer.zip`.
+3. Flash → reboot. Screen-e **superkey** (`ApXXXXXXXX`) dekhabe — note koro
+   (kernel-e set hoyeche; **app-e entry deoar option nei**, app signature
+   diye auto-verify kore).
 4. Reboot → sdcard theke `FolkPatch-Manager.apk` (**ZIP-er official APK tai**,
    onno APK noy) install koro → app kholo → Installed/Active dekhabe.
 5. App **already installed**? Purono app uninstall kore ZIP-er official APK
@@ -107,7 +108,7 @@ Freeze safety in this build: each A/B slot is patched from **its own** stock
 1. Recovery log-e **`ROOT ACTIVE on current slot`** ache kina dekho — na
    thakle flash asole partition-e atkani (vul target / flash blocked).
 2. ZIP-er **official Manager APK** install korecho kina dekho — onno
-   source-er APK (onno signature) hole auth hobe na, key-chaoa/Not Installed
+   source-er APK (onno signature) hole auth hobe na, Not Installed
    dekhabe.
 3. App-e `Installed/Active` na asle recovery log-er `Verify` line + app
    screenshot niye issue kholo.
@@ -119,7 +120,7 @@ Freeze safety in this build: each A/B slot is patched from **its own** stock
 1. Put your **stock** `boot.img` (from your firmware) on
    sdcard, named:
    `FolkPatch-stock-boot.img`.
-2. Flash `FolkPatch-v8.0-kp0.13.8-Boot-Patcher.zip` from recovery
+2. Flash `FolkPatch-v9.0-kp0.13.8-Boot-Patcher.zip` from recovery
    (it does **not** touch any partition).
 3. It writes `FolkPatch-patched-boot.img` to sdcard.
 4. On PC: `fastboot flash boot <file>`
@@ -128,7 +129,7 @@ Freeze safety in this build: each A/B slot is patched from **its own** stock
 
 ## Uninstall
 
-Flash `FolkPatch-v8.0-kp0.13.8-Uninstaller.zip`.
+Flash `FolkPatch-v9.0-kp0.13.8-Uninstaller.zip`.
 If a stock backup (`FolkPatch-Backup/stock-*.img`) exists it is restored
 automatically.
 
@@ -139,7 +140,7 @@ automatically.
   selects the installer by ZIP name, then `exec`s it.
 - `scripts/InstallFP.sh` — reads the live `boot` partition (boot-only,
   universal — `init_boot` is NEVER flashed),
-  backs it up, `unpack → keyless patch (kptools + kpimg, signature-auth) → repack → flash`.
+  backs it up, `unpack → REAL-key patch (kptools -S, boot_patch.sh rule) → repack → flash`.
 - `scripts/PatchOnly.sh` — same pipeline on a stock image file, no flashing.
 - `scripts/UninstallFP.sh` — restores backup or live-unpatches (`kptools -u`).
 - Recovery has no Android runtime (`/system/bin/linker64` is a dangling
@@ -154,7 +155,7 @@ official FolkPatch APK and packs the ZIPs:
 
 ```sh
 python tools/build.py
-# outputs dist/FolkPatch-v8.0-kp0.13.8-*.zip + SHA256SUMS.txt
+# outputs dist/FolkPatch-v9.0-kp0.13.8-*.zip + SHA256SUMS.txt
 ```
 
 Pushing a `v*` tag runs the same build in GitHub Actions and attaches the
@@ -178,10 +179,10 @@ ZIPs to the GitHub Release automatically.
 APK rename করে ZIP করলে flash হয় না — recovery-তে `update-binary` +
 installer script লাগে, যা APK-তে থাকে না। এই repo সেই layer যোগ করেছে।
 
-- **সহজ (recommended):** Recovery-Installer ZIP flash করো → reboot →
+- **সহজ (recommended):** Recovery-Installer ZIP flash করো → superkey note
+  করো (kernel-e set hoy; **app-e entry option nei**) → reboot →
   sdcard থেকে ZIP-er official Manager APK install করো → অ্যাপ খোলো →
-  Installed/Active দেখাবে। **Kono key/superkey lagbe NA** (FolkPatch 4.3+
-  theke signature-auth — app-e key deoar option nei)।
+  Installed/Active দেখাবে।
 - **অ্যাপ আগে থেকে install থাকলে:** purono app uninstall kore ZIP-er official
   APK install koro (onno signature hole auth hobe na)।
 - **নিরাপদ (advanced):** stock `boot.img` sdcard-তে
