@@ -6,10 +6,12 @@ Downloads nothing by default: uses FolkPatch.apk placed next to this repo
 
 Usage:
     python tools/build.py [--apk PATH] [--out dist] [--version 5.0] [--kp 0.13.8]
+    python tools/build.py --tag v5.1-kp0.13.8   # tag drives ZIP filenames
 """
 import argparse
 import hashlib
 import os
+import re
 import sys
 import urllib.request
 import zipfile
@@ -69,7 +71,22 @@ if __name__ == "__main__":
     ap.add_argument("--out", default=os.path.join(ROOT, "dist"))
     ap.add_argument("--version", default="5.0")
     ap.add_argument("--kp", default="0.13.8")
+    ap.add_argument("--tag", default="",
+                    help="Release tag like v5.1-kp0.13.8; drives ZIP names + README.txt")
     args = ap.parse_args()
+
+    if args.tag:
+        m = re.match(r"^v(.+?)-[kK][pP](.+)$", args.tag.strip())
+        if m:
+            args.version, args.kp = m.group(1), m.group(2)
+            print("Tag %s -> version=%s kp=%s" % (args.tag, args.version, args.kp))
+        else:
+            print("WARNING: --tag %s not like v<ver>-kp<kp>, using --version/--kp" % args.tag)
+        tag = args.tag.lstrip("v")
+        tag = "v" + tag
+    else:
+        tag = "v%s-KP%s" % (args.version, args.kp)
+    print("Building: %s" % tag)
 
     apk_path = args.apk
     if not os.path.exists(apk_path):
@@ -108,7 +125,6 @@ if __name__ == "__main__":
         apk = f.read()
 
     os.makedirs(args.out, exist_ok=True)
-    tag = "v%s-KP%s" % (args.version, args.kp)
     outs = []
     outs.append(build("FolkPatch-%s-Recovery-Installer.zip" % tag, "InstallFP.sh", inst, ub, us, rd, bb, kt, kp, apk))
     outs.append(build("FolkPatch-%s-Boot-Patcher.zip" % tag, "PatchOnly.sh", patch, ub, us, rd, bb, kt, kp, apk))

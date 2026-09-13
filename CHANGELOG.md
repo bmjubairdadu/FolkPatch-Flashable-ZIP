@@ -2,7 +2,7 @@
 
 All notable changes to this project are documented here.
 
-## [Unreleased] — auto-root + freeze fixes
+## [v5.1-kp0.13.8] — 2026-09-13 — auto-root + freeze fixes
 
 ### Fixed
 - 🐛 **Wrong target fixed:** installer now patches `boot` first (kernel lives

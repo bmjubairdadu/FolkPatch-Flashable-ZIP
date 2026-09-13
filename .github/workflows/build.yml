@@ -22,7 +22,12 @@ jobs:
           curl -sL -o FolkPatch.apk https://github.com/LyraVoid/FolkPatch/releases/download/kp0.13.8/FolkPatch_115032_5.0_on_main-release.apk
           sha256sum FolkPatch.apk
       - name: Build flashable ZIPs
-        run: python tools/build.py
+        run: |
+          if [ -n "${{ github.ref_name }}" ]; then
+            python tools/build.py --tag "${{ github.ref_name }}"
+          else
+            python tools/build.py
+          fi
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
