@@ -60,6 +60,15 @@ def build(outname, script_name, script_data, ub, us, rd, bb, kt, kp, apk, extra=
     for name, data in (extra or []):
         w(z, name, data, 0o755)
     w(z, "assets/" + script_name, script_data, 0o755)
+    # Also include assets folder contents (apd, fpd, resetprop, etc.)
+    assets_dir = os.path.join(ROOT, "assets")
+    if os.path.isdir(assets_dir):
+        for root, dirs, files in os.walk(assets_dir):
+            for fname in files:
+                fpath = os.path.join(root, fname)
+                arcname = os.path.relpath(fpath, ROOT)
+                with open(fpath, "rb") as f:
+                    w(z, arcname, f.read(), 0o755)
     w(z, "FolkPatch.apk", apk, 0o644)
     w(z, "README.txt", rd, 0o644)
     z.close()
