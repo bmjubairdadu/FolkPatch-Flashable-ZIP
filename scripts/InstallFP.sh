@@ -133,8 +133,8 @@ if [ ! -f "$KPIMG" ]; then abort "kpimg missing"; fi
 
 ui_print "****************************"
 ui_print " FolkPatch FINAL All-in-One"
-ui_print " v6.0 / KP-0.13.8"
-ui_print " FolkTool method + recovery flash"
+ui_print " v7.0 / KP-0.13.8"
+ui_print " official signature-auth, NO KEY needed"
 ui_print "****************************"
 
 ABI=""
@@ -240,21 +240,16 @@ if [ -z "$TARGET" ]; then
 fi
 
 SKEY=""
+# FolkPatch 4.3+: official auth = SIGNATURE, no password/key needed.
+# No key is written into the kernel. The bundled official APK only.
 for d in /sdcard /data/media/0 /data/media /external_sd; do
   if [ -f "$d/FolkPatch-key.txt" ]; then
-    SKEY=$(cat "$d/FolkPatch-key.txt" 2>/dev/null | head -n 1 | tr -d ' \t\r\n')
-    if [ -n "$SKEY" ]; then
-      ui_print "- Reusing saved key from $d/FolkPatch-key.txt"
-      break
-    fi
+    rm -f "$d/FolkPatch-key.txt" 2>/dev/null
+    ui_print "- Removed old FolkPatch-key.txt (not needed anymore)"
   fi
 done
-if [ -z "$SKEY" ]; then
-  R=$(cat /proc/sys/kernel/random/uuid 2>/dev/null | cut -d- -f1 | tr -d ' \t\r\n')
-  if [ -z "$R" ]; then R="00000000"; fi
-  SKEY="Ap$R"
-  ui_print "- New superkey generated"
-fi
+rm -f /data/FolkPatch-Backup/FolkPatch-key.txt 2>/dev/null
+ui_print "- Auth: official signature mode (no superkey needed)"
 
 BKDIR=""
 for d in /sdcard/FolkPatch-Backup /data/media/0/FolkPatch-Backup /external_sd/FolkPatch-Backup; do
@@ -316,11 +311,8 @@ if [ -s "/data/FolkPatch-Backup/stock-$TARGET_KIND$SLOT.img" ]; then
 else
   run_cp -f "$WORK/boot.img" "/data/FolkPatch-Backup/stock-$TARGET_KIND$SLOT.img" 2>/dev/null
 fi
-echo "$SKEY" > /data/FolkPatch-Backup/FolkPatch-key.txt 2>/dev/null
-echo "$SKEY" > "$BKDIR/FolkPatch-key.txt" 2>/dev/null
-for d in /sdcard /data/media/0 /data/media /external_sd; do
-  if [ -d "$d" ]; then echo "$SKEY" > "$d/FolkPatch-key.txt" 2>/dev/null; fi
-done
+# No key files: official signature-auth needs none.
+rm -f "$BKDIR/FolkPatch-key.txt" 2>/dev/null
 ui_print "- Stock image saved: $BKDIR/stock-$TARGET_KIND$SLOT.img"
 if run_cp -f "$WORK/boot.img" /data/boot.img 2>/dev/null; then
   ui_print "- Origin image also saved to /data/boot.img (official layout)"
@@ -330,29 +322,10 @@ if [ -f kernel-origin ]; then rm -f kernel-origin 2>/dev/null; fi
 mv kernel kernel-origin 2>/dev/null || abort "cannot stage kernel"
 
 ui_print "- Patching kernel (this can take a minute) ..."
-ui_print "- FolkTool method first: KEYLESS patch (no -s/-S) ..."
-KEYMODE=""
+ui_print "- Official flow: KEYLESS patch, signature-auth (FolkPatch 4.3+) ..."
+KEYMODE="keyless"
 kp_run -p -i kernel-origin -k "$KPIMG" -o kernel >"$WORK/patch.log" 2>&1
 RC=$?
-if [ "$RC" -eq 0 ]; then KEYMODE="keyless"; fi
-if [ "$RC" -ne 0 ]; then
-  ui_print "- NOTE: keyless failed ($RC), trying root-skey ..."
-  kp_run -p -i kernel-origin -S "$SKEY" -k "$KPIMG" -o kernel >"$WORK/patch.log" 2>&1
-  RC=$?
-  if [ "$RC" -eq 0 ]; then KEYMODE="root-skey"; fi
-fi
-if [ "$RC" -ne 0 ]; then
-  ui_print "- NOTE: root-skey failed ($RC), trying skey+root-skey ..."
-  kp_run -p -i kernel-origin -s "$SKEY" -S "$SKEY" -k "$KPIMG" -o kernel >"$WORK/patch.log" 2>&1
-  RC=$?
-  if [ "$RC" -eq 0 ]; then KEYMODE="both"; fi
-fi
-if [ "$RC" -ne 0 ]; then
-  ui_print "- NOTE: combined failed ($RC), trying legacy skey ..."
-  kp_run -p -i kernel-origin -s "$SKEY" -k "$KPIMG" -o kernel >"$WORK/patch.log" 2>&1
-  RC=$?
-  if [ "$RC" -eq 0 ]; then KEYMODE="skey"; fi
-fi
 print_file "$WORK/patch.log"
 if [ "$RC" -ne 0 ]; then abort "patch failed ($RC)"; fi
 if [ -n "$KEYMODE" ]; then ui_print "- Key mode OK: $KEYMODE"; fi
@@ -376,14 +349,13 @@ else
   ui_print "- WARNING: verify log has no patched=true line!"
   ui_print "- Flashing anyway, on-partition check below is final."
 fi
-# Canonical key check: root_superkey hash must match the key we set.
-# (Manager app unlocks with root-superkey. If empty/mismatch -> app says
-#  Not Installed even though kernel is patched = tomar obostha.)
-_VL=$(run_grep -i "root_superkey" "$WORK/verify.log" 2>/dev/null | head -n 1)
+# Signature-auth (FolkPatch 4.3+): no superkey in kernel, app verifies
+# the official manager signature instead. Only informational.
+_VL=$(run_grep -i "superkey" "$WORK/verify.log" 2>/dev/null | head -n 1)
 if [ -n "$_VL" ]; then
   ui_print "- $_VL"
 else
-  ui_print "- NOTE: verify log shows no root_superkey line"
+  ui_print "- Keyless kernel (official signature-auth, no key line expected)"
 fi
 
 if ! kp_run -i kernel-origin -f 2>/dev/null | run_grep -q "CONFIG_KALLSYMS_ALL=y"; then
@@ -444,14 +416,6 @@ if [ -n "$OTHER" ]; then
       if kp_run unpack boot.img >"$WORK/ounpack.log" 2>&1 && [ -f kernel ]; then
         mv kernel kernel-origin 2>/dev/null
         if kp_run -p -i kernel-origin -k "$KPIMG" -o kernel >"$WORK/opatch.log" 2>&1; then _orc=0; else _orc=$?; fi
-        if [ "$_orc" -ne 0 ]; then
-          kp_run -p -i kernel-origin -S "$SKEY" -k "$KPIMG" -o kernel >"$WORK/opatch.log" 2>&1
-          _orc=$?
-        fi
-        if [ "$_orc" -ne 0 ]; then
-          kp_run -p -i kernel-origin -s "$SKEY" -k "$KPIMG" -o kernel >"$WORK/opatch.log" 2>&1
-          _orc=$?
-        fi
         if [ "$_orc" -eq 0 ] && kp_run repack boot.img >"$WORK/orepack.log" 2>&1 && [ -f "$WORK/new-boot.img" ]; then
           run_cp -f "$WORK/new-boot.img" "$WORK/new-boot-inactive.img" 2>/dev/null
           _osz=$(wc -c < "$WORK/new-boot.img" 2>/dev/null | tr -d ' \t\r\n')
@@ -603,16 +567,14 @@ if [ -f "$WORK/new-boot.img" ]; then
 fi
 
 ui_print "****************************"
-ui_print " FolkPatch FINAL installed! Auto-root active."
-if [ "$KEYMODE" = "keyless" ]; then
-  ui_print " Key: KEYLESS (FolkTool niyom) - app prothom kholar por NIJER key set koro."
-else
-  ui_print " Key: $SKEY (saved to sdcard) - app-e EI key tai dao."
-fi
+ui_print " FolkPatch installed! Auto-root active."
+ui_print " NO KEY NEEDED (official signature-auth)."
 ui_print " Stock backup: $BKDIR/stock-$TARGET_KIND$SLOT.img"
 ui_print " BADHOTAMULOK:"
-ui_print " 1. Reboot -> FolkPatch-Manager.apk INSTALL koro."
-ui_print " 2. App kholo -> key dao/set koro -> Installed/Active."
+ui_print " 1. Reboot -> sdcard-er FolkPatch-Manager.apk INSTALL koro"
+ui_print "    (ZIP-er sathe thaka official APK tai - onno APK noy)."
+ui_print " 2. App kholo -> Installed/Active dekhabe, key chaibe NA."
+ui_print " 3. Root Checker diye verify koro."
 ui_print " Bootloop/freeze? Flash Uninstaller ZIP or restore stock img."
 ui_print "****************************"
 exit 0

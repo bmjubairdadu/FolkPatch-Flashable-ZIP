@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented here.
 
+## [v7.0-kp0.13.8] — 2026-09-13 — NO-KEY official flow (4.3+ signature-auth)
+
+### Fixed
+- 🐛 **App-e key deoar option nai — etai thik:** official doc onujayi FolkPatch
+  4.3+ theke auth = signature, kono password lage na. Kernel-e ar `-s/-S` key
+  lekha hoy NA — keyless patch. Manager app-e key chaoar kothao na.
+- 🐛 Purono `FolkPatch-key.txt` flash-er somoy auto-delete (confusion sesh).
+- 🐛 Onno source-er APK (onno signature) hole auth hobe na — tai ZIP-er
+  official APK-tai install korte hobe (README + final screen-e bola ache).
+
 ## [v6.0-kp0.13.8] — 2026-09-13 — FINAL 2-in-1 (FolkTool + recovery)
 
 ### Added
