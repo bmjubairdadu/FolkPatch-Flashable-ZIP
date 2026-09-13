@@ -1,0 +1,72 @@
+[+] restore header backup before parsing patched kernel image
+[+] kernel image_size: 0x01b72e90
+[+] kernel uefi header: false
+[+] kernel load_offset: 0x00080000
+[+] kernel kernel_size: 0x01dee000
+[+] kernel page_shift: 12
+[+] patched kernel image ...
+[+] is_gki: false
+[+] linux_banner 1: Linux version 4.9.337-DaisyForGaming (JUBAIR@JUBAIR-HOSEN) (DaisyForGaming by JUBAIR HOSEN) #1 SMP PREEMPT Sun Sep 13 05:07:34 CST 2026
+[+] linux_banner offset: 0x1220060
+[+] kernel version major: 4, minor: 9, patch: 255
+[+] kallsyms_token_table offset: 0x01610b00
+[+] endian: little
+[+] kallsyms_token_index offset: 0x01610f00
+[?] kallsyms_markers elem_size 8 rejected at [1] (val 0xc6400000000)
+[+] kallsyms_markers range: [0x01610500, 0x01610aac), count: 0x0000016a
+[+] kallsyms_names offset: 0x0150a100
+[+] arm64 relocation kernel_va: 0xffffffffffffffff
+[?] can't find arm64 relocation table
+[?] kallsyms_markers elem_size 8 rejected at [1] (val 0xc6400000000)
+[+] kallsyms_markers range: [0x01610500, 0x01610aac), count: 0x0000016a
+[+] try kallsyms_offsets first for 64-bit relative-base kernel
+[?] find approximate kallsyms_offsets error
+[+] fallback to kallsyms_addresses scan
+[+] approximate kallsyms_addresses range: [0x01454800, 0x01509ff0) count: 0x00016afe
+[+] kallsyms_names offset: 0x0150a100
+[+] kallsyms_num_syms offset: 0x0150a000, value: 0x00016afe
+[+] names table linux_banner index: 0x0000ccf2
+[+] linux_banner index: 0
+[+] kallsyms_addresses offset: 0x01454800
+[+] kernel base address: 0xffffff8010080000
+[+] pid_vnr: type: T, offset: 0x0006c7f0
+[+] pid_vnr verfied sp_el0, insn: 0xd5384101 (off +0)
+[+] ikconfig gzip blob at 0x1232aa8, size 0x8d67 (runtime puff)
+[+] layout kimg: 0x0,0x1afe808, kpimg: 0x1aff000,0x73e10, extra: 0x1b72e10,0x80, end: 0x1b72e90, start: 0x1dee000
+[+] kpimg version: d08
+[+] kpimg compile time: 08:03:59 Aug 31 2026
+[+] kpimg config: android, release, arm64
+[+] tcp_init_sock: type: T, offset: 0x01007f50
+[+] select map anchor: tcp_init_sock, offset: 0x01007f50
+[+] map_start: 0x1007f50, max_size: 0x1000
+[+] Synced NOP modifications from kallsym_kimg to output file (offset: 0x1007f50, size: 0x2000)
+[+] sprintf: type: T, offset: 0x00400360
+[+] show_stack: type: T, offset: 0x0000a160
+[+] kallsyms_lookup_name: type: T, offset: 0x00003800
+[+] prefer runtime forward scan anchor for kallsyms_lookup_name: show_stack, offset: 0x0000a160
+[+] printk: type: T, offset: 0x011e8890
+[+] memblock_reserve: type: T, offset: 0x0017a790
+[+] memblock_free: type: T, offset: 0x0017a730
+[+] memblock_mark_nomap: type: T, offset: 0x0017aa80
+[?] no symbol: memblock_phys_alloc_try_nid
+[+] memblock_virt_alloc_try_nid: type: T, offset: 0x0182f564
+[+] memblock_alloc_try_nid: type: T, offset: 0x0182f4a8
+[+] use memblock_alloc_try_nid as map phys alloc
+[+] kallsyms_lookup_name: type: T, offset: 0x00003800
+[+] printk: type: T, offset: 0x011e8890
+[+] panic: type: T, offset: 0x011e7dd4
+[+] rest_init: type: t, offset: 0x012024b0
+[+] kernel_init: type: t, offset: 0x01202528
+[?] no symbol: report_cfi_failure
+[?] no symbol: __cfi_slowpath_diag
+[?] no symbol: __cfi_slowpath
+[?] no CFI failure handler symbol (report_cfi_failure / __cfi_slowpath_diag / __cfi_slowpath)
+[?] if the kernel has CONFIG_CFI_CLANG (Android 13+ GKI common), every kCFI mismatch on KP memory will panic -> random reboots; the KP core will retry resolution via kallsyms at boot
+[?] no symbol: copy_process
+[+] copy_process -> copy_process.part.0: type: t, offset: 0x00046490
+[+] avc_denied: type: t, offset: 0x0035b3d0
+[+] slow_avc_audit: type: T, offset: 0x0035b590
+[+] input_handle_event: type: t, offset: 0x008c7890
+[+] superkey: Ap6977832d
+[+] paging_init: type: T, offset: 0x01825d3c
+[+] patch done: kernel

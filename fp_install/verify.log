@@ -1,0 +1,13 @@
+[kernel]
+banner=Linux version 4.9.337-DaisyForGaming (JUBAIR@JUBAIR-HOSEN) (DaisyForGaming by JUBAIR HOSEN) #1 SMP PREEMPT Sun Sep 13 05:07:34 CST 2026
+patched=true
+[kpimg]
+version=0xd08
+compile_time=08:03:59 Aug 31 2026
+config=android,release
+arch=arm64
+superkey=Ap6977832d
+root_superkey=0000000000000000000000000000000000000000000000000000000000000000
+[additional]
+[extras]
+num=0

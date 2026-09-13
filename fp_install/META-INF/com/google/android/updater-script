@@ -1,0 +1,5 @@
+# APatch updater script
+# This ZIP uses Magisk-style update-binary; updater-script is kept minimal.
+# The real installation logic is in META-INF/com/google/android/update-binary
+# which selects InstallFP.sh / PatchOnly.sh / UninstallFP.sh by ZIP filename.
+

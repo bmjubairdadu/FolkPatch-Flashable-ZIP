@@ -1,0 +1,77 @@
+- TMPDIR=/tmp
+- args: 1=3 2=47 3=/sideload/package.zip 0=/tmp/updater
+-r--r--r-- 1 root root 15299984 1970-01-01 01:00 /sideload/package.zip
+- ls ZIP rc=0
+- installer dir: /tmp/fp_install err=0
+- extracting busybox ...
+Archive:  /sideload/package.zip
+  inflating: /tmp/busybox
+- unzip busybox rc=0
+-rwxr-xr-x 1 root root 1710600 2026-09-13 16:12 /tmp/busybox
+-rwxr-xr-x 1 root root 1710600 2026-09-13 16:12 /tmp/busybox
+- busybox ready: /tmp/busybox
+- extracting payload ...
+Archive:  /sideload/package.zip
+  inflating: /tmp/fp_install/FolkPatch.apk
+  inflating: /tmp/fp_install/README.txt
+- unzip payload rc=0
+- retry with busybox unzip
+Archive:  /sideload/package.zip
+  inflating: META-INF/com/google/android/update-binary
+  inflating: META-INF/com/google/android/updater-script
+  inflating: lib/arm64-v8a/libbusybox.so
+  inflating: lib/arm64-v8a/libkptools.so
+  inflating: assets/apd
+  inflating: assets/fpd
+  inflating: assets/resetprop
+  inflating: assets/InstallFP.sh
+  inflating: assets/kpimg
+  inflating: assets/PatchOnly.sh
+  inflating: assets/UninstallFP.sh
+  inflating: FolkPatch.apk
+  inflating: README.txt
+- bb unzip rc=0
+/tmp/fp_install:
+FolkPatch.apk
+META-INF
+README.txt
+assets
+lib
+
+/tmp/fp_install/META-INF:
+com
+
+/tmp/fp_install/META-INF/com:
+google
+
+/tmp/fp_install/META-INF/com/google:
+android
+
+/tmp/fp_install/META-INF/com/google/android:
+update-binary
+updater-script
+
+/tmp/fp_install/assets:
+InstallFP.sh
+PatchOnly.sh
+UninstallFP.sh
+apd
+fpd
+kpimg
+resetprop
+
+/tmp/fp_install/lib:
+arm64-v8a
+
+/tmp/fp_install/lib/arm64-v8a:
+libbusybox.so
+libkptools.so
+-rwxr-xr-x 1 root root 23399 2026-09-13 16:12 /tmp/fp_install/assets/InstallFP.sh
+-rwxr-xr-x 1 root root 9164 2026-09-13 16:12 /tmp/fp_install/assets/PatchOnly.sh
+-rwxr-xr-x 1 root root 10378 2026-09-13 16:12 /tmp/fp_install/assets/UninstallFP.sh
+-rwxr-xr-x 1 root root 1710600 2026-09-13 16:12 /tmp/fp_install/lib/arm64-v8a/libbusybox.so
+-rwxr-xr-x 1 root root 243936 2026-09-13 16:12 /tmp/fp_install/lib/arm64-v8a/libkptools.so
+-rwxr-xr-x 1 root root 474640 2026-09-13 16:12 /tmp/fp_install/assets/kpimg
+- lower ZIP: /sideload/package.zip
+- launching: /tmp/fp_install/assets/InstallFP.sh
+- DBG log at: /tmp/fp_debug.log (will survive on /tmp)
