@@ -132,9 +132,9 @@ fi
 if [ ! -f "$KPIMG" ]; then abort "kpimg missing"; fi
 
 ui_print "****************************"
-ui_print " FolkPatch Direct Flash"
-ui_print " v5.3 / KP-0.13.8"
-ui_print " WITH SYSTEM FIXES"
+ui_print " FolkPatch FINAL All-in-One"
+ui_print " v6.0 / KP-0.13.8"
+ui_print " FolkTool method + recovery flash"
 ui_print "****************************"
 
 ABI=""
@@ -330,11 +330,17 @@ if [ -f kernel-origin ]; then rm -f kernel-origin 2>/dev/null; fi
 mv kernel kernel-origin 2>/dev/null || abort "cannot stage kernel"
 
 ui_print "- Patching kernel (this can take a minute) ..."
-ui_print "- Mode: official first (root-skey, same as boot_patch.sh) ..."
+ui_print "- FolkTool method first: KEYLESS patch (no -s/-S) ..."
 KEYMODE=""
-kp_run -p -i kernel-origin -S "$SKEY" -k "$KPIMG" -o kernel >"$WORK/patch.log" 2>&1
+kp_run -p -i kernel-origin -k "$KPIMG" -o kernel >"$WORK/patch.log" 2>&1
 RC=$?
-if [ "$RC" -eq 0 ]; then KEYMODE="root-skey"; fi
+if [ "$RC" -eq 0 ]; then KEYMODE="keyless"; fi
+if [ "$RC" -ne 0 ]; then
+  ui_print "- NOTE: keyless failed ($RC), trying root-skey ..."
+  kp_run -p -i kernel-origin -S "$SKEY" -k "$KPIMG" -o kernel >"$WORK/patch.log" 2>&1
+  RC=$?
+  if [ "$RC" -eq 0 ]; then KEYMODE="root-skey"; fi
+fi
 if [ "$RC" -ne 0 ]; then
   ui_print "- NOTE: root-skey failed ($RC), trying skey+root-skey ..."
   kp_run -p -i kernel-origin -s "$SKEY" -S "$SKEY" -k "$KPIMG" -o kernel >"$WORK/patch.log" 2>&1
@@ -437,9 +443,9 @@ if [ -n "$OTHER" ]; then
       run_cp -f "$WORK/obot.img" "$WORK/boot.img" 2>/dev/null
       if kp_run unpack boot.img >"$WORK/ounpack.log" 2>&1 && [ -f kernel ]; then
         mv kernel kernel-origin 2>/dev/null
-        if kp_run -p -i kernel-origin -S "$SKEY" -k "$KPIMG" -o kernel >"$WORK/opatch.log" 2>&1; then _orc=0; else _orc=$?; fi
+        if kp_run -p -i kernel-origin -k "$KPIMG" -o kernel >"$WORK/opatch.log" 2>&1; then _orc=0; else _orc=$?; fi
         if [ "$_orc" -ne 0 ]; then
-          kp_run -p -i kernel-origin -s "$SKEY" -S "$SKEY" -k "$KPIMG" -o kernel >"$WORK/opatch.log" 2>&1
+          kp_run -p -i kernel-origin -S "$SKEY" -k "$KPIMG" -o kernel >"$WORK/opatch.log" 2>&1
           _orc=$?
         fi
         if [ "$_orc" -ne 0 ]; then
@@ -585,16 +591,28 @@ fi
 if [ -n "$OLD_LD_PRELOAD" ]; then export LD_PRELOAD="$OLD_LD_PRELOAD"; fi
 if [ -n "$OLD_LD_CONFIG" ]; then export LD_CONFIG_FILE="$OLD_LD_CONFIG"; fi
 
+# DUAL-METHOD 2-in-1: direct flash done above; also leave fastboot-ready file.
+if [ -f "$WORK/new-boot.img" ]; then
+  for d in /sdcard /data/media/0 /data/media /external_sd; do
+    if [ -d "$d" ]; then
+      run_cp -f "$WORK/new-boot.img" "$d/FolkPatch-patched-$TARGET_KIND.img" 2>/dev/null
+    fi
+  done
+  ui_print "- Patched file also on sdcard: FolkPatch-patched-$TARGET_KIND.img"
+  ui_print "- Plan B (PC): fastboot flash $TARGET_KIND FolkPatch-patched-$TARGET_KIND.img"
+fi
+
 ui_print "****************************"
-ui_print " FolkPatch installed! Auto-root active."
-ui_print " Key: $SKEY (saved to sdcard)"
+ui_print " FolkPatch FINAL installed! Auto-root active."
+if [ "$KEYMODE" = "keyless" ]; then
+  ui_print " Key: KEYLESS (FolkTool niyom) - app prothom kholar por NIJER key set koro."
+else
+  ui_print " Key: $SKEY (saved to sdcard) - app-e EI key tai dao."
+fi
 ui_print " Stock backup: $BKDIR/stock-$TARGET_KIND$SLOT.img"
-ui_print " Next (BADHOTAMULOK - skip korle root paba na):"
-ui_print " 1. Reboot -> sdcard theke FolkPatch-Manager.apk INSTALL koro."
-ui_print " 2. App kholo -> ei Key dao: $SKEY"
-ui_print " 3. Installed/Active = root done."
-ui_print " App install na korle root USE kora jabe na!"
-ui_print " Purono note kora key noy - EI flash-er key tai dao."
+ui_print " BADHOTAMULOK:"
+ui_print " 1. Reboot -> FolkPatch-Manager.apk INSTALL koro."
+ui_print " 2. App kholo -> key dao/set koro -> Installed/Active."
 ui_print " Bootloop/freeze? Flash Uninstaller ZIP or restore stock img."
 ui_print "****************************"
 exit 0

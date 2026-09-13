@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented here.
 
+## [v6.0-kp0.13.8] — 2026-09-13 — FINAL 2-in-1 (FolkTool + recovery)
+
+### Added
+- ✨ **DUAL-METHOD ek ZIP-e:** [FolkTool](https://github.com/LyraVoid/FolkTool)
+  niyome age **KEYLESS patch** (`-p -i -k -o`, kono `-s/-S` noy — thik
+  FolkTool-er `kptools_service.dart` moto, manager app + `apd`). Fail hole
+  tobei key mode fallback.
+- ✨ Direct-flash + fastboot file duitai: flash-er por patched
+  `FolkPatch-patched-*.img` sdcard-eo thake (Plan B: PC theke fastboot).
+- ✨ Keyless hole final screen-e bolei dey: app khule NIJER key set koro.
+
 ## [v5.3-kp0.13.8] — 2026-09-13 — sob-fix pack
 
 ### Fixed

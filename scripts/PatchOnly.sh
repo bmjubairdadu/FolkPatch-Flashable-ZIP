@@ -180,15 +180,15 @@ if kp_run -i kernel -l 2>/dev/null | run_grep -qi "patched=true"; then
   abort "source image already patched - use a STOCK boot.img"
 fi
 if [ "$BB_OK" = "1" ]; then "$BB" mv kernel kernel-origin 2>/dev/null || abort "cannot stage kernel"; else mv kernel kernel-origin 2>/dev/null || abort "cannot stage kernel"; fi
-ui_print "- Mode: official first (root-skey, same as boot_patch.sh) ..."
-kp_run -p -i kernel-origin -S "$SKEY" -k "$KPIMG" -o kernel >"$WORK/patch.log" 2>&1
+ui_print "- Mode: FolkTool first (KEYLESS patch, no -s/-S) ..."
+kp_run -p -i kernel-origin -k "$KPIMG" -o kernel >"$WORK/patch.log" 2>&1
 RC=$?
 if [ "$RC" -ne 0 ]; then
-  kp_run -p -i kernel-origin -s "$SKEY" -S "$SKEY" -k "$KPIMG" -o kernel >"$WORK/patch.log" 2>&1
+  kp_run -p -i kernel-origin -S "$SKEY" -k "$KPIMG" -o kernel >"$WORK/patch.log" 2>&1
   RC=$?
 fi
 if [ "$RC" -ne 0 ]; then
-  kp_run -p -i kernel-origin -s "$SKEY" -k "$KPIMG" -o kernel >"$WORK/patch.log" 2>&1
+  kp_run -p -i kernel-origin -s "$SKEY" -S "$SKEY" -k "$KPIMG" -o kernel >"$WORK/patch.log" 2>&1
   RC=$?
 fi
 print_file "$WORK/patch.log"
