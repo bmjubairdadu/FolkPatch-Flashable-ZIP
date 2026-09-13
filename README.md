@@ -33,13 +33,13 @@ This project provides **complete flashable ZIPs with**:
 
 Get the ZIPs from the
 [**Releases page**](https://github.com/bmjubairdadu/FolkPatch-Flashable-ZIP/releases)
-(`v5.2-kp0.13.8`):
+(`v5.3-kp0.13.8`):
 
 | File | What it does |
 |---|---|
-| `FolkPatch-v5.2-kp0.13.8-Recovery-Installer.zip` | ⭐ **Recommended — Direct flash** — patches & flashes `boot` (kernel lives here on old **and** new devices) with `vendor_kernel_boot`/`init_boot` fallback. Easiest, no PC needed. |
-| `FolkPatch-v5.2-kp0.13.8-Boot-Patcher.zip` | **Safe file mode (advanced)** — patches a stock `boot`/`init_boot` image on your sdcard, **never touches partitions**. You then `fastboot flash` the patched image from a PC. |
-| `FolkPatch-v5.2-kp0.13.8-Uninstaller.zip` | Restores the stock backup, or live-unpatches the kernel. |
+| `FolkPatch-v5.3-kp0.13.8-Recovery-Installer.zip` | ⭐ **Recommended — Direct flash** — patches & flashes `boot` (kernel lives here on old **and** new devices) with `vendor_kernel_boot`/`init_boot` fallback. Easiest, no PC needed. |
+| `FolkPatch-v5.3-kp0.13.8-Boot-Patcher.zip` | **Safe file mode (advanced)** — patches a stock `boot`/`init_boot` image on your sdcard, **never touches partitions**. You then `fastboot flash` the patched image from a PC. |
+| `FolkPatch-v5.3-kp0.13.8-Uninstaller.zip` | Restores the stock backup, or live-unpatches the kernel. |
 
 Each ZIP also bundles the `FolkPatch-Manager.apk` (copied to sdcard on install)
 and a `README.txt` (Bangla guide).
@@ -88,11 +88,11 @@ This release includes patches for:
 
 1. Copy the Installer ZIP (and the APK) to sdcard.
 2. Boot recovery → Install → flash
-   `FolkPatch-v5.2-kp0.13.8-Recovery-Installer.zip`.
+   `FolkPatch-v5.3-kp0.13.8-Recovery-Installer.zip`.
 3. The screen shows your **superkey** (`ApXXXXXXXX`) — write it down.
    It's also saved as `FolkPatch-key.txt` on sdcard.
-4. Reboot → install `FolkPatch-Manager.apk` from sdcard (auto-copied by the
-   installer, also in `Download/FolkPatch/`) → open the app, enter the
+4. Reboot → install `FolkPatch-Manager.apk` from sdcard (**BADHOTAMULOK** —
+   app chara root use kora jabe na) → open the app, enter the
    superkey **once** → it shows Installed/Active. The kernel is already
    patched, so root is active — the app just needs the key to connect.
 5. App **already installed**? Just open it after flashing — it detects the
@@ -120,7 +120,7 @@ re-flashing reuses the saved key instead of writing a mismatched one.
 1. Put your **stock** `boot.img` / `init_boot.img` (from your firmware) on
    sdcard, named:
    `FolkPatch-stock-boot.img` (or `FolkPatch-stock-init_boot.img`).
-2. Flash `FolkPatch-v5.2-kp0.13.8-Boot-Patcher.zip` from recovery
+2. Flash `FolkPatch-v5.3-kp0.13.8-Boot-Patcher.zip` from recovery
    (it does **not** touch any partition).
 3. It writes `FolkPatch-patched-boot.img` to sdcard.
 4. On PC: `fastboot flash boot <file>`
@@ -129,7 +129,7 @@ re-flashing reuses the saved key instead of writing a mismatched one.
 
 ## Uninstall
 
-Flash `FolkPatch-v5.2-kp0.13.8-Uninstaller.zip`.
+Flash `FolkPatch-v5.3-kp0.13.8-Uninstaller.zip`.
 If a stock backup (`FolkPatch-Backup/stock-*.img`) exists it is restored
 automatically.
 
@@ -154,7 +154,7 @@ official FolkPatch APK and packs the ZIPs:
 
 ```sh
 python tools/build.py
-# outputs dist/FolkPatch-v5.2-kp0.13.8-*.zip + SHA256SUMS.txt
+# outputs dist/FolkPatch-v5.3-kp0.13.8-*.zip + SHA256SUMS.txt
 ```
 
 Pushing a `v*` tag runs the same build in GitHub Actions and attaches the

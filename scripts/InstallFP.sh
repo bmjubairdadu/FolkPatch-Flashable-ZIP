@@ -133,7 +133,7 @@ if [ ! -f "$KPIMG" ]; then abort "kpimg missing"; fi
 
 ui_print "****************************"
 ui_print " FolkPatch Direct Flash"
-ui_print " v5.2 / KP-0.13.8"
+ui_print " v5.3 / KP-0.13.8"
 ui_print " WITH SYSTEM FIXES"
 ui_print "****************************"
 
@@ -172,6 +172,14 @@ if [ -z "$SLOT" ] && command -v getprop >/dev/null 2>&1; then
   fi
 fi
 if [ "$SLOT" = "normal" ]; then SLOT=""; fi
+# Slot hidden (daisy/OrangeFox): boot_a/boot_b thakle A/B dhore _a default.
+# Inactive-slot loop duit slot-i patch kore, jei slot-e boot hok root thakbe.
+if [ -z "$SLOT" ]; then
+  if find_block "boot_a" >/dev/null 2>&1 || find_block "boot_b" >/dev/null 2>&1; then
+    SLOT="_a"
+    ui_print "- Slot hidden by recovery, A/B found: using _a (both slots patched)"
+  fi
+fi
 if [ -n "$SLOT" ]; then
   ui_print "- A/B slot: $SLOT"
 else
@@ -232,7 +240,7 @@ if [ -z "$TARGET" ]; then
 fi
 
 SKEY=""
-for d in /sdcard /data/media/0 /external_sd; do
+for d in /sdcard /data/media/0 /data/media /external_sd; do
   if [ -f "$d/FolkPatch-key.txt" ]; then
     SKEY=$(cat "$d/FolkPatch-key.txt" 2>/dev/null | head -n 1 | tr -d ' \t\r\n')
     if [ -n "$SKEY" ]; then
@@ -275,6 +283,11 @@ ui_print "- Reading $TARGET ..."
 run_dd "if=$TARGET" of="$WORK/boot.img" bs=1048576 2>"$WORK/dd_read.log" || abort "cannot read $TARGET"
 print_file "$WORK/dd_read.log"
 if [ ! -s "$WORK/boot.img" ]; then abort "read produced empty boot.img"; fi
+_RSZ=$(wc -c < "$WORK/boot.img" 2>/dev/null | tr -d ' \t\r\n')
+if [ -n "$_RSZ" ] && [ "$_RSZ" != "0" ] && [ "$_RSZ" -lt 4194304 ]; then
+  abort "read only $_RSZ bytes (too small for boot.img) - wrong partition?"
+fi
+ui_print "- Read ${_RSZ} bytes"
 
 ui_print "- Unpacking boot image ..."
 kp_run unpack boot.img >"$WORK/unpack.log" 2>&1
@@ -305,7 +318,7 @@ else
 fi
 echo "$SKEY" > /data/FolkPatch-Backup/FolkPatch-key.txt 2>/dev/null
 echo "$SKEY" > "$BKDIR/FolkPatch-key.txt" 2>/dev/null
-for d in /sdcard /data/media/0 /external_sd; do
+for d in /sdcard /data/media/0 /data/media /external_sd; do
   if [ -d "$d" ]; then echo "$SKEY" > "$d/FolkPatch-key.txt" 2>/dev/null; fi
 done
 ui_print "- Stock image saved: $BKDIR/stock-$TARGET_KIND$SLOT.img"
@@ -317,21 +330,26 @@ if [ -f kernel-origin ]; then rm -f kernel-origin 2>/dev/null; fi
 mv kernel kernel-origin 2>/dev/null || abort "cannot stage kernel"
 
 ui_print "- Patching kernel (this can take a minute) ..."
-ui_print "- Setting both keys (skey + root-skey, same value) ..."
-kp_run -p -i kernel-origin -s "$SKEY" -S "$SKEY" -k "$KPIMG" -o kernel >"$WORK/patch.log" 2>&1
+ui_print "- Mode: official first (root-skey, same as boot_patch.sh) ..."
+KEYMODE=""
+kp_run -p -i kernel-origin -S "$SKEY" -k "$KPIMG" -o kernel >"$WORK/patch.log" 2>&1
 RC=$?
+if [ "$RC" -eq 0 ]; then KEYMODE="root-skey"; fi
 if [ "$RC" -ne 0 ]; then
-  ui_print "- NOTE: combined key mode failed ($RC), trying root-skey only ..."
-  kp_run -p -i kernel-origin -S "$SKEY" -k "$KPIMG" -o kernel >"$WORK/patch.log" 2>&1
+  ui_print "- NOTE: root-skey failed ($RC), trying skey+root-skey ..."
+  kp_run -p -i kernel-origin -s "$SKEY" -S "$SKEY" -k "$KPIMG" -o kernel >"$WORK/patch.log" 2>&1
   RC=$?
+  if [ "$RC" -eq 0 ]; then KEYMODE="both"; fi
 fi
 if [ "$RC" -ne 0 ]; then
-  ui_print "- NOTE: root-skey mode failed ($RC), trying legacy skey only ..."
+  ui_print "- NOTE: combined failed ($RC), trying legacy skey ..."
   kp_run -p -i kernel-origin -s "$SKEY" -k "$KPIMG" -o kernel >"$WORK/patch.log" 2>&1
   RC=$?
+  if [ "$RC" -eq 0 ]; then KEYMODE="skey"; fi
 fi
 print_file "$WORK/patch.log"
 if [ "$RC" -ne 0 ]; then abort "patch failed ($RC)"; fi
+if [ -n "$KEYMODE" ]; then ui_print "- Key mode OK: $KEYMODE"; fi
 if run_grep -qi "patch done" "$WORK/patch.log"; then
   ui_print "- Patch reports done"
 else
@@ -419,9 +437,9 @@ if [ -n "$OTHER" ]; then
       run_cp -f "$WORK/obot.img" "$WORK/boot.img" 2>/dev/null
       if kp_run unpack boot.img >"$WORK/ounpack.log" 2>&1 && [ -f kernel ]; then
         mv kernel kernel-origin 2>/dev/null
-        if kp_run -p -i kernel-origin -s "$SKEY" -S "$SKEY" -k "$KPIMG" -o kernel >"$WORK/opatch.log" 2>&1; then _orc=0; else _orc=$?; fi
+        if kp_run -p -i kernel-origin -S "$SKEY" -k "$KPIMG" -o kernel >"$WORK/opatch.log" 2>&1; then _orc=0; else _orc=$?; fi
         if [ "$_orc" -ne 0 ]; then
-          kp_run -p -i kernel-origin -S "$SKEY" -k "$KPIMG" -o kernel >"$WORK/opatch.log" 2>&1
+          kp_run -p -i kernel-origin -s "$SKEY" -S "$SKEY" -k "$KPIMG" -o kernel >"$WORK/opatch.log" 2>&1
           _orc=$?
         fi
         if [ "$_orc" -ne 0 ]; then
@@ -460,6 +478,13 @@ for _v in "/dev/block/by-name/vbmeta$SLOT" /dev/block/by-name/vbmeta "/dev/block
     break
   fi
 done
+_VB=""
+if command -v getprop >/dev/null 2>&1; then _VB=$(getprop ro.boot.verifiedbootstate 2>/dev/null); fi
+if [ "$_VB" = "green" ]; then
+  ui_print "- WARNING: AVB=green (verification ON) - patched boot may be rejected!"
+  ui_print "- Fix: unlock bootloader, then fastboot with"
+  ui_print "  --disable-verity --disable-verification, then reflash."
+fi
 rm -f "$WORK/boot.img" "$WORK/obot.img" 2>/dev/null
 # Restore current-slot image: inactive-slot step reused the new-boot.img name.
 if [ -f "$WORK/new-boot-current.img" ]; then
@@ -564,11 +589,12 @@ ui_print "****************************"
 ui_print " FolkPatch installed! Auto-root active."
 ui_print " Key: $SKEY (saved to sdcard)"
 ui_print " Stock backup: $BKDIR/stock-$TARGET_KIND$SLOT.img"
-ui_print " Next: reboot -> install FolkPatch-Manager.apk"
-ui_print " -> open app, enter THIS key once -> Installed/Active."
-ui_print " Old noted key noy - ei flash-er Key tai dao."
-ui_print " App says Not Installed? Key milche kina dekho,"
-ui_print " reboot kore abar kholo, log-e ROOT ACTIVE line chilo kina dekho."
+ui_print " Next (BADHOTAMULOK - skip korle root paba na):"
+ui_print " 1. Reboot -> sdcard theke FolkPatch-Manager.apk INSTALL koro."
+ui_print " 2. App kholo -> ei Key dao: $SKEY"
+ui_print " 3. Installed/Active = root done."
+ui_print " App install na korle root USE kora jabe na!"
+ui_print " Purono note kora key noy - EI flash-er key tai dao."
 ui_print " Bootloop/freeze? Flash Uninstaller ZIP or restore stock img."
 ui_print "****************************"
 exit 0

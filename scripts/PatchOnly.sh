@@ -146,7 +146,7 @@ if [ "$KIND" = "init_boot" ]; then
 fi
 
 SKEY=""
-for d in /sdcard /data/media/0 /external_sd; do
+for d in /sdcard /data/media/0 /data/media /external_sd; do
   if [ -f "$d/FolkPatch-key.txt" ]; then
     SKEY=$(cat "$d/FolkPatch-key.txt" 2>/dev/null | head -n 1 | tr -d ' \t\r\n')
     if [ -n "$SKEY" ]; then break; fi
@@ -180,15 +180,15 @@ if kp_run -i kernel -l 2>/dev/null | run_grep -qi "patched=true"; then
   abort "source image already patched - use a STOCK boot.img"
 fi
 if [ "$BB_OK" = "1" ]; then "$BB" mv kernel kernel-origin 2>/dev/null || abort "cannot stage kernel"; else mv kernel kernel-origin 2>/dev/null || abort "cannot stage kernel"; fi
-ui_print "- Setting both skey + root-skey (manager upgrade safe) ..."
-kp_run -p -i kernel-origin -s "$SKEY" -S "$SKEY" -k "$KPIMG" -o kernel >"$WORK/patch.log" 2>&1
+ui_print "- Mode: official first (root-skey, same as boot_patch.sh) ..."
+kp_run -p -i kernel-origin -S "$SKEY" -k "$KPIMG" -o kernel >"$WORK/patch.log" 2>&1
 RC=$?
 if [ "$RC" -ne 0 ]; then
-  kp_run -p -i kernel-origin -S "$SKEY" -k "$KPIMG" -o kernel >"$WORK/patch.log" 2>&1
+  kp_run -p -i kernel-origin -s "$SKEY" -S "$SKEY" -k "$KPIMG" -o kernel >"$WORK/patch.log" 2>&1
   RC=$?
 fi
 if [ "$RC" -ne 0 ]; then
-  kp_run -p --image kernel-origin --skey "$SKEY" --kpimg "$KPIMG" --out kernel >"$WORK/patch.log" 2>&1
+  kp_run -p -i kernel-origin -s "$SKEY" -k "$KPIMG" -o kernel >"$WORK/patch.log" 2>&1
   RC=$?
 fi
 print_file "$WORK/patch.log"

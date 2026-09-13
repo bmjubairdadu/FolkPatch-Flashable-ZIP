@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented here.
 
+## [v5.3-kp0.13.8] — 2026-09-13 — sob-fix pack
+
+### Fixed
+- 🐛 **Official key order:** patch ekhon official `boot_patch.sh`-er moto age
+  `-S` (root-skey) only, tarpor combined, tarpor legacy — Manager key handshake
+  mismatch kombe. Key mode screen-e dekhay.
+- 🐛 **Slot-hidden A/B:** recovery slot na janale `_a` default + duit slot-i
+  nijer stock theke patch — jei slot-e boot hok root thakbe.
+- 🐛 **AVB warning:** `verifiedbootstate=green` hole agei warning + fix command.
+- 🐛 **Tiny-read guard:** 4MB-er choto read hole abort (vul partition dhora porbe).
+- 🐛 Final screen + README ekhon manager-install BADHOTAMULOK bole.
+
 ## [v5.2-kp0.13.8] — 2026-09-13 — flash-stuck detection
 
 ### Fixed
