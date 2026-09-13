@@ -35,6 +35,11 @@ abort() {
 }
 
 cd "$WORK" 2>/dev/null || abort "cannot cd to $WORK"
+mount -o bind /dev/urandom /dev/random 2>/dev/null
+OLD_LD_PRELOAD="$LD_PRELOAD"
+OLD_LD_CONFIG="$LD_CONFIG_FILE"
+unset LD_PRELOAD 2>/dev/null
+unset LD_CONFIG_FILE 2>/dev/null
 # --- kptools needs Android linker+libs. Recovery /system is a stub, real system must be mounted ---
 # kptools PT_INTERP = /system/bin/linker64 (often symlink -> /apex/...). Both must resolve.
 # Fix = mount real system + apex, then run kptools DIRECTLY (never invoke linker manually).
@@ -101,7 +106,16 @@ run_cp() {
 run_grep() {
   if [ "$BB_OK" = "1" ]; then "$BB" grep "$@"; else grep "$@"; fi
 }
-if [ "$BB_OK" = "1" ]; then "$BB" chmod 755 "$KPTOOLS" 2>/dev/null; fi
+if ! command -v gzip >/dev/null 2>&1; then
+  if [ "$BB_OK" = "1" ] && "$BB" gzip --help >/dev/null 2>&1; then
+    mkdir -p "$WORK/bin" 2>/dev/null
+    ln -sf "$BB" "$WORK/bin/gzip" 2>/dev/null
+    PATH="$WORK/bin:$PATH"
+    ui_print "- gzip linked from busybox"
+  else
+    ui_print "- WARNING: gzip missing, repack may fail"
+  fi
+fi
 if [ ! -f "$KPTOOLS" ]; then abort "kptools missing"; fi
 if [ ! -f "$KPIMG" ]; then abort "kpimg missing"; fi
 
@@ -110,8 +124,9 @@ ui_print " FolkPatch Boot Patcher"
 ui_print " (file mode, no auto-flash)"
 ui_print "****************************"
 
+# Kernel lives in boot: prefer boot images first (init_boot = ramdisk only).
 SRC=""
-for f in /sdcard/FolkPatch-stock-init_boot.img /sdcard/FolkPatch-stock-boot.img /data/media/0/FolkPatch-stock-boot.img /sdcard/init_boot.img /sdcard/boot.img /sdcard/stock_boot.img /sdcard/stock_init_boot.img /external_sd/boot.img /external_sd/init_boot.img; do
+for f in /sdcard/FolkPatch-stock-boot.img /data/media/0/FolkPatch-stock-boot.img /sdcard/boot.img /sdcard/stock_boot.img /external_sd/boot.img /sdcard/FolkPatch-stock-init_boot.img /sdcard/init_boot.img /sdcard/stock_init_boot.img /external_sd/init_boot.img; do
   if [ -s "$f" ]; then SRC="$f"; break; fi
 done
 if [ -z "$SRC" ]; then
@@ -125,6 +140,10 @@ case "$SRC" in
   *init_boot*) KIND="init_boot" ;;
   *) KIND="boot" ;;
 esac
+if [ "$KIND" = "init_boot" ]; then
+  ui_print "- NOTE: init_boot holds ramdisk, kernel patch needs boot."
+  ui_print "- If root does not activate, redo with stock boot.img."
+fi
 
 SKEY=""
 for d in /sdcard /data/media/0 /external_sd; do
@@ -157,11 +176,30 @@ if ! kp_run -i kernel -f 2>/dev/null | run_grep -q "CONFIG_KALLSYMS=y"; then
   abort "kernel needs CONFIG_KALLSYMS=y"
 fi
 ui_print "- Kernel check passed"
+if kp_run -i kernel -l 2>/dev/null | run_grep -qi "patched=true"; then
+  abort "source image already patched - use a STOCK boot.img"
+fi
 if [ "$BB_OK" = "1" ]; then "$BB" mv kernel kernel-origin 2>/dev/null || abort "cannot stage kernel"; else mv kernel kernel-origin 2>/dev/null || abort "cannot stage kernel"; fi
-kp_run -p --image kernel-origin --skey "$SKEY" --kpimg "$KPIMG" --out kernel >"$WORK/patch.log" 2>&1
+ui_print "- Setting both skey + root-skey (manager upgrade safe) ..."
+kp_run -p -i kernel-origin -s "$SKEY" -S "$SKEY" -k "$KPIMG" -o kernel >"$WORK/patch.log" 2>&1
 RC=$?
+if [ "$RC" -ne 0 ]; then
+  kp_run -p -i kernel-origin -S "$SKEY" -k "$KPIMG" -o kernel >"$WORK/patch.log" 2>&1
+  RC=$?
+fi
+if [ "$RC" -ne 0 ]; then
+  kp_run -p --image kernel-origin --skey "$SKEY" --kpimg "$KPIMG" --out kernel >"$WORK/patch.log" 2>&1
+  RC=$?
+fi
 print_file "$WORK/patch.log"
 if [ "$RC" -ne 0 ]; then abort "patch failed ($RC)"; fi
+ui_print "- Verifying ..."
+kp_run -i kernel -l >"$WORK/verify.log" 2>&1
+print_file "$WORK/verify.log"
+if run_grep -qi "patched=false" "$WORK/verify.log"; then abort "verify failed (patched=false)"; fi
+if ! kp_run -i kernel-origin -f 2>/dev/null | run_grep -q "CONFIG_KALLSYMS_ALL=y"; then
+  ui_print "- WARNING: CONFIG_KALLSYMS_ALL off; keep stock backup safe."
+fi
 kp_run repack boot.img >"$WORK/repack.log" 2>&1 || abort "repack failed"
 print_file "$WORK/repack.log"
 if [ ! -f "$WORK/new-boot.img" ]; then abort "new-boot.img missing"; fi
@@ -169,9 +207,14 @@ if [ ! -f "$WORK/new-boot.img" ]; then abort "new-boot.img missing"; fi
 OUT="$OUTDIR/FolkPatch-patched-$KIND.img"
 if [ "$BB_OK" = "1" ]; then "$BB" cp -f "$WORK/new-boot.img" "$OUT" 2>/dev/null || abort "cannot write $OUT"; else cp -f "$WORK/new-boot.img" "$OUT" 2>/dev/null || abort "cannot write $OUT"; fi
 echo "$SKEY" > "$OUTDIR/FolkPatch-key.txt" 2>/dev/null
+mkdir -p "$OUTDIR/Download/FolkPatch/BootBackups" 2>/dev/null
+run_cp -f "$SRC" "$OUTDIR/Download/FolkPatch/BootBackups/" 2>/dev/null
 if [ -f "$WORK/FolkPatch.apk" ]; then
-  "$BB" cp -f "$WORK/FolkPatch.apk" "$OUTDIR/FolkPatch-Manager.apk" 2>/dev/null
+  run_cp -f "$WORK/FolkPatch.apk" "$OUTDIR/FolkPatch-Manager.apk" 2>/dev/null
+  run_cp -f "$WORK/FolkPatch.apk" "$OUTDIR/Download/FolkPatch/FolkPatch-Manager.apk" 2>/dev/null
 fi
+if [ -n "$OLD_LD_PRELOAD" ]; then export LD_PRELOAD="$OLD_LD_PRELOAD"; fi
+if [ -n "$OLD_LD_CONFIG" ]; then export LD_CONFIG_FILE="$OLD_LD_CONFIG"; fi
 
 ui_print "****************************"
 ui_print " Patched image ready:"

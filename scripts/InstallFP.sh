@@ -36,6 +36,12 @@ abort() {
 }
 
 cd "$WORK" 2>/dev/null || abort "cannot cd to $WORK"
+# --- recovery stability: entropy + clean libs (prevents patch hangs) ---
+mount -o bind /dev/urandom /dev/random 2>/dev/null
+OLD_LD_PRELOAD="$LD_PRELOAD"
+OLD_LD_CONFIG="$LD_CONFIG_FILE"
+unset LD_PRELOAD 2>/dev/null
+unset LD_CONFIG_FILE 2>/dev/null
 # --- kptools needs Android linker+libs. Recovery /system is a stub, real system must be mounted ---
 # kptools PT_INTERP = /system/bin/linker64 (often symlink -> /apex/...). Both must resolve.
 # Fix = mount real system + apex, then run kptools DIRECTLY (never invoke linker manually).
@@ -102,6 +108,17 @@ run_cp() {
 run_grep() {
   if [ "$BB_OK" = "1" ]; then "$BB" grep "$@"; else grep "$@"; fi
 }
+# kptools repack shells out to external gzip; some recoveries lack it.
+if ! command -v gzip >/dev/null 2>&1; then
+  if [ "$BB_OK" = "1" ] && "$BB" gzip --help >/dev/null 2>&1; then
+    mkdir -p "$WORK/bin" 2>/dev/null
+    ln -sf "$BB" "$WORK/bin/gzip" 2>/dev/null
+    PATH="$WORK/bin:$PATH"
+    ui_print "- gzip linked from busybox"
+  else
+    ui_print "- WARNING: gzip missing, repack may fail"
+  fi
+fi
 if [ -z "$KPTOOLS" ]; then abort "kptools missing"; fi
 chmod 755 "$KPTOOLS" 2>/dev/null
 if [ "$BB_OK" = "1" ]; then "$BB" chmod 755 "$KPTOOLS" 2>/dev/null; fi
@@ -133,40 +150,81 @@ case "$ABI" in
     ;;
 esac
 
+# --- slot: cmdline first (recovery getprop is often empty), then getprop ---
 SLOT=""
-if command -v getprop >/dev/null 2>&1; then
+if [ -f /proc/cmdline ]; then
+  _cmdline=$(cat /proc/cmdline 2>/dev/null)
+  case "$_cmdline" in
+    *androidboot.slot_suffix=*)
+      SLOT=$(echo "$_cmdline" | tr ' ' '\n' 2>/dev/null | grep '^androidboot.slot_suffix=' 2>/dev/null | head -n 1 | cut -d= -f2)
+      ;;
+  esac
+  if [ -z "$SLOT" ]; then
+    _s=$(echo "$_cmdline" | tr ' ' '\n' 2>/dev/null | grep '^androidboot.slot=' 2>/dev/null | head -n 1 | cut -d= -f2)
+    if [ -n "$_s" ]; then SLOT="_$_s"; fi
+  fi
+fi
+if [ -z "$SLOT" ] && command -v getprop >/dev/null 2>&1; then
   SLOT=$(getprop ro.boot.slot_suffix 2>/dev/null)
   if [ -z "$SLOT" ]; then
     S=$(getprop ro.boot.slot 2>/dev/null)
     if [ -n "$S" ]; then SLOT="_$S"; fi
   fi
 fi
+if [ "$SLOT" = "normal" ]; then SLOT=""; fi
 if [ -n "$SLOT" ]; then
   ui_print "- A/B slot: $SLOT"
 else
   ui_print "- Slot: A-only (or unknown)"
 fi
 
-find_part() {
-  for p in "/dev/block/by-name/$1$SLOT" "/dev/block/by-name/$1" "/dev/block/bootdevice/by-name/$1$SLOT" "/dev/block/bootdevice/by-name/$1"; do
+# by-name lives in different places per recovery/kernel: check all + generic search.
+find_block() {
+  _b="$1"
+  for p in "/dev/block/by-name/$_b" "/dev/block/bootdevice/by-name/$_b"; do
     if [ -e "$p" ]; then echo "$p"; return 0; fi
   done
+  for _m in /dev/block/platform/*/by-name/"$_b"; do
+    if [ -e "$_m" ]; then echo "$_m"; return 0; fi
+  done
+  _dev=$(find /dev/block -iname "$_b" 2>/dev/null | head -n 1)
+  if [ -n "$_dev" ]; then echo "$_dev"; return 0; fi
   return 1
 }
 
+find_part() {
+  if [ -n "$SLOT" ]; then
+    _t=$(find_block "$1$SLOT")
+    if [ -n "$_t" ]; then echo "$_t"; return 0; fi
+  fi
+  _t=$(find_block "$1")
+  if [ -n "$_t" ]; then echo "$_t"; return 0; fi
+  return 1
+}
+
+# KernelPatch patches the KERNEL, which lives in boot - never init_boot.
+# (init_boot holds ramdisk on new devices; patching it = no root + panic/freeze.)
+# So boot is always preferred; init_boot is only a last-resort fallback.
 TARGET=""
 TARGET_KIND=""
-T=$(find_part "init_boot")
+T=$(find_part "boot")
 if [ -n "$T" ]; then
   TARGET="$T"
-  TARGET_KIND="init_boot"
-  ui_print "- Target: init_boot ($TARGET)"
+  TARGET_KIND="boot"
+  ui_print "- Target: boot ($TARGET)"
 else
-  T=$(find_part "boot")
+  T=$(find_part "vendor_kernel_boot")
   if [ -n "$T" ]; then
     TARGET="$T"
-    TARGET_KIND="boot"
-    ui_print "- Target: boot ($TARGET)"
+    TARGET_KIND="vendor_kernel_boot"
+    ui_print "- Target: vendor_kernel_boot ($TARGET)"
+  else
+    T=$(find_part "init_boot")
+    if [ -n "$T" ]; then
+      TARGET="$T"
+      TARGET_KIND="init_boot"
+      ui_print "- WARNING: only init_boot found (no boot) - unusual, continuing"
+    fi
   fi
 fi
 if [ -z "$TARGET" ]; then
@@ -204,6 +262,15 @@ fi
 if [ ! -d "$BKDIR" ]; then abort "no writable backup dir"; fi
 ui_print "- Backup dir: $BKDIR"
 
+_BAT=""
+for _b in /sys/class/power_supply/battery/capacity /sys/class/power_supply/Battery/capacity; do
+  if [ -f "$_b" ]; then _BAT=$(cat "$_b" 2>/dev/null | tr -d ' \t\r\n'); break; fi
+done
+case "$_BAT" in
+  ''|*[!0-9]*) ;;
+  *) if [ "$_BAT" -lt 25 ]; then ui_print "- WARNING: battery ${_BAT}% - charge above 50% before flashing!"; fi ;;
+esac
+
 ui_print "- Reading $TARGET ..."
 run_dd "if=$TARGET" of="$WORK/boot.img" bs=1048576 2>"$WORK/dd_read.log" || abort "cannot read $TARGET"
 print_file "$WORK/dd_read.log"
@@ -220,6 +287,10 @@ if ! kp_run -i kernel -f 2>/dev/null | run_grep -q "CONFIG_KALLSYMS=y"; then
   abort "kernel needs CONFIG_KALLSYMS=y (not enabled on this kernel)"
 fi
 ui_print "- Kernel check passed (CONFIG_KALLSYMS=y)"
+if kp_run -i kernel -l 2>/dev/null | run_grep -qi "patched=true"; then
+  ui_print "- NOTE: live image already patched, updating with same key."
+  ui_print "- To use a new key, flash Uninstaller first."
+fi
 
 if [ -s "$BKDIR/stock-$TARGET_KIND$SLOT.img" ]; then
   ui_print "- Keeping existing stock backup (re-flash detected)."
@@ -246,10 +317,26 @@ if [ -f kernel-origin ]; then rm -f kernel-origin 2>/dev/null; fi
 mv kernel kernel-origin 2>/dev/null || abort "cannot stage kernel"
 
 ui_print "- Patching kernel (this can take a minute) ..."
-kp_run -p --image kernel-origin --skey "$SKEY" --kpimg "$KPIMG" --out kernel >"$WORK/patch.log" 2>&1
+ui_print "- Setting both skey + root-skey (manager upgrade safe) ..."
+kp_run -p -i kernel-origin -s "$SKEY" -S "$SKEY" -k "$KPIMG" -o kernel >"$WORK/patch.log" 2>&1
 RC=$?
+if [ "$RC" -ne 0 ]; then
+  ui_print "- NOTE: combined key mode failed ($RC), trying root-skey only ..."
+  kp_run -p -i kernel-origin -S "$SKEY" -k "$KPIMG" -o kernel >"$WORK/patch.log" 2>&1
+  RC=$?
+fi
+if [ "$RC" -ne 0 ]; then
+  ui_print "- NOTE: root-skey mode failed ($RC), trying legacy skey only ..."
+  kp_run -p --image kernel-origin --skey "$SKEY" --kpimg "$KPIMG" --out kernel >"$WORK/patch.log" 2>&1
+  RC=$?
+fi
 print_file "$WORK/patch.log"
 if [ "$RC" -ne 0 ]; then abort "patch failed ($RC)"; fi
+if run_grep -qi "patch done" "$WORK/patch.log"; then
+  ui_print "- Patch reports done"
+else
+  ui_print "- NOTE: no 'patch done' line, verifying via -l below"
+fi
 
 ui_print "- Verifying patched kernel ..."
 kp_run -i kernel -l >"$WORK/verify.log" 2>&1
@@ -273,16 +360,36 @@ if [ "$RC" -ne 0 ]; then abort "repack failed ($RC)"; fi
 if [ ! -f "$WORK/new-boot.img" ]; then abort "new-boot.img missing after repack"; fi
 
 flash_target() {
-  ui_print "- Flashing $1 ..."
-  run_dd "if=$WORK/new-boot.img" "of=$1" bs=1048576 2>"$WORK/dd_write.log"
-  RC=$?
+  # block-aware flash: size check + rw + fsync (official flash_image logic).
+  _img="$WORK/new-boot.img"
+  _part="$1"
+  _sz=$(wc -c < "$_img" 2>/dev/null | tr -d ' \t\r\n')
+  if [ -z "$_sz" ] || [ "$_sz" = "0" ]; then abort "patched image empty, refusing to flash"; fi
+  if command -v blockdev >/dev/null 2>&1; then
+    _bsz=$(blockdev --getsize64 "$_part" 2>/dev/null)
+    if [ -n "$_bsz" ] && [ "$_bsz" != "0" ] && [ "$_sz" -gt "$_bsz" ]; then
+      abort "patched image ($_sz) larger than partition ($_bsz), refusing to flash"
+    fi
+    blockdev --setrw "$_part" 2>/dev/null
+  fi
+  ui_print "- Flashing $1 (${_sz} bytes) ..."
+  # plain dd + sync: works on busybox, toybox and toolbox dd alike.
+  if [ "$BB_OK" = "1" ]; then
+    "$BB" dd "if=$_img" "of=$1" bs=4096 2>"$WORK/dd_write.log" || abort "flash failed on $1. Restore stock image manually!"
+  else
+    dd "if=$_img" "of=$1" bs=4096 2>"$WORK/dd_write.log" || abort "flash failed on $1. Restore stock image manually!"
+  fi
   print_file "$WORK/dd_write.log"
-  if [ "$RC" -ne 0 ]; then abort "flash failed ($RC) on $1. Restore stock image manually!"; fi
+  sync 2>/dev/null
 }
 
 flash_target "$TARGET"
-sync 2>/dev/null
 
+# Save current-slot image: inactive-slot patch below reuses new-boot.img name.
+run_cp -f "$WORK/new-boot.img" "$WORK/new-boot-current.img" 2>/dev/null
+
+# Inactive slot: patch ITS OWN stock (slots often have different kernels).
+# Flashing current slot's image to the other slot = freeze/bootloop on slot switch.
 OTHER=""
 INACTIVE_FLASHED=""
 case "$SLOT" in
@@ -290,21 +397,43 @@ case "$SLOT" in
   _b) OTHER="_a" ;;
 esac
 if [ -n "$OTHER" ]; then
-  for p in "/dev/block/by-name/$TARGET_KIND$OTHER" "/dev/block/bootdevice/by-name/$TARGET_KIND$OTHER"; do
-    if [ -e "$p" ] && [ "$p" != "$TARGET" ]; then
-      ui_print "- Also patching inactive slot ($p) ..."
-      run_dd "if=$WORK/new-boot.img" "of=$p" bs=1048576 2>"$WORK/dd_write2.log"
-      RC2=$?
-      print_file "$WORK/dd_write2.log"
-      if [ "$RC2" -ne 0 ]; then
-        ui_print "- WARNING: inactive-slot flash failed, current slot is still patched."
+  _op=$(find_block "$TARGET_KIND$OTHER")
+  if [ -n "$_op" ] && [ "$_op" != "$TARGET" ]; then
+    ui_print "- Patching inactive slot from its own stock ($TARGET_KIND$OTHER) ..."
+    if run_dd "if=$_op" of="$WORK/obot.img" bs=1048576 2>"$WORK/dd_oread.log" && [ -s "$WORK/obot.img" ]; then
+      rm -f kernel kernel-origin new-boot.img 2>/dev/null
+      run_cp -f "$WORK/obot.img" "$WORK/boot.img" 2>/dev/null
+      if kp_run unpack boot.img >"$WORK/ounpack.log" 2>&1 && [ -f kernel ]; then
+        mv kernel kernel-origin 2>/dev/null
+        if kp_run -p -i kernel-origin -s "$SKEY" -S "$SKEY" -k "$KPIMG" -o kernel >"$WORK/opatch.log" 2>&1; then _orc=0; else _orc=$?; fi
+        if [ "$_orc" -ne 0 ]; then
+          kp_run -p -i kernel-origin -S "$SKEY" -k "$KPIMG" -o kernel >"$WORK/opatch.log" 2>&1
+          _orc=$?
+        fi
+        if [ "$_orc" -eq 0 ] && kp_run repack boot.img >"$WORK/orepack.log" 2>&1 && [ -f "$WORK/new-boot.img" ]; then
+          _osz=$(wc -c < "$WORK/new-boot.img" 2>/dev/null | tr -d ' \t\r\n')
+          ui_print "- Flashing inactive slot ($_op, ${_osz} bytes) ..."
+          if [ "$BB_OK" = "1" ]; then "$BB" dd "if=$WORK/new-boot.img" "of=$_op" bs=4096 2>"$WORK/dd_write2.log"; else dd "if=$WORK/new-boot.img" "of=$_op" bs=4096 2>"$WORK/dd_write2.log"; fi
+          sync 2>/dev/null
+          if [ "$?" -eq 0 ]; then
+            ui_print "- Inactive slot patched."
+            INACTIVE_FLASHED="$_op"
+          else
+            ui_print "- WARNING: inactive-slot flash failed, current slot is still patched."
+          fi
+        else
+          ui_print "- WARNING: inactive slot patch failed, skipping (current slot OK)."
+          print_file "$WORK/opatch.log"
+        fi
       else
-        ui_print "- Inactive slot patched."
-        INACTIVE_FLASHED="$p"
+        ui_print "- WARNING: inactive slot unpack failed, skipping."
       fi
-      break
+      # restore current-slot files for verify step below
+      rm -f kernel kernel-origin 2>/dev/null
+    else
+      ui_print "- WARNING: cannot read inactive slot, skipping."
     fi
-  done
+  fi
 fi
 for _v in "/dev/block/by-name/vbmeta$SLOT" /dev/block/by-name/vbmeta "/dev/block/bootdevice/by-name/vbmeta$SLOT"; do
   if [ -e "$_v" ]; then
@@ -312,7 +441,11 @@ for _v in "/dev/block/by-name/vbmeta$SLOT" /dev/block/by-name/vbmeta "/dev/block
     break
   fi
 done
-rm -f "$WORK/boot.img" 2>/dev/null
+rm -f "$WORK/boot.img" "$WORK/obot.img" 2>/dev/null
+# Restore current-slot image: inactive-slot step reused the new-boot.img name.
+if [ -f "$WORK/new-boot-current.img" ]; then
+  run_cp -f "$WORK/new-boot-current.img" "$WORK/new-boot.img" 2>/dev/null
+fi
 _NSZ=$(wc -c < "$WORK/new-boot.img" 2>/dev/null | tr -d ' \t\r\n')
 if [ -n "$_NSZ" ]; then ui_print "- Patched image size: $_NSZ bytes"; fi
 do_cmp() {
@@ -351,19 +484,33 @@ if [ -n "$INACTIVE_FLASHED" ]; then
 fi
 sync 2>/dev/null
 
+# Stage manager APK + key where the app/upgrade flow expects them.
+# Recovery has no package manager, so first install is manual - but kernel is
+# already patched, so after reboot: install APK -> enter superkey once ->
+# app shows Installed/Active -> later upgrades keep working.
 if [ -f "$WORK/FolkPatch.apk" ]; then
   for d in /sdcard /data/media/0 /external_sd; do
-    if [ -d "$d" ]; then run_cp -f "$WORK/FolkPatch.apk" "$d/FolkPatch-Manager.apk" 2>/dev/null; fi
+    if [ -d "$d" ]; then
+      run_cp -f "$WORK/FolkPatch.apk" "$d/FolkPatch-Manager.apk" 2>/dev/null
+      mkdir -p "$d/Download/FolkPatch/BootBackups" 2>/dev/null
+      run_cp -f "$WORK/FolkPatch.apk" "$d/Download/FolkPatch/FolkPatch-Manager.apk" 2>/dev/null
+      if [ -f "$BKDIR/stock-$TARGET_KIND$SLOT.img" ]; then
+        run_cp -f "$BKDIR/stock-$TARGET_KIND$SLOT.img" "$d/Download/FolkPatch/BootBackups/" 2>/dev/null
+      fi
+    fi
   done
-  ui_print "- Manager APK copied to sdcard (FolkPatch-Manager.apk)"
+  ui_print "- Manager APK on sdcard (FolkPatch-Manager.apk)"
 fi
+if [ -n "$OLD_LD_PRELOAD" ]; then export LD_PRELOAD="$OLD_LD_PRELOAD"; fi
+if [ -n "$OLD_LD_CONFIG" ]; then export LD_CONFIG_FILE="$OLD_LD_CONFIG"; fi
 
 ui_print "****************************"
-ui_print " FolkPatch installed!"
+ui_print " FolkPatch installed! Auto-root active."
 ui_print " Key: $SKEY (saved to sdcard)"
 ui_print " Stock backup: $BKDIR/stock-$TARGET_KIND$SLOT.img"
-ui_print " Both A/B slots patched (no slot fallback)."
-ui_print " Reboot, install APK, app should show Installed/Active."
-ui_print " Bootloop? Flash Uninstaller ZIP or restore stock img."
+ui_print " Next: reboot -> install FolkPatch-Manager.apk"
+ui_print " -> open app, enter key once -> shows Installed/Active."
+ui_print " After that, app upgrades keep root (same key)."
+ui_print " Bootloop/freeze? Flash Uninstaller ZIP or restore stock img."
 ui_print "****************************"
 exit 0

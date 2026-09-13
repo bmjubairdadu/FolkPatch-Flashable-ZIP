@@ -37,7 +37,7 @@ Get the ZIPs from the
 
 | File | What it does |
 |---|---|
-| `FolkPatch-v5.0-KP0.13.8-Recovery-Installer.zip` | ⭐ **Recommended — Direct flash** — patches & flashes `init_boot` (preferred) or `boot` from recovery. Easiest, no PC needed. |
+| `FolkPatch-v5.0-KP0.13.8-Recovery-Installer.zip` | ⭐ **Recommended — Direct flash** — patches & flashes `boot` (kernel lives here on old **and** new devices) with `vendor_kernel_boot`/`init_boot` fallback. Easiest, no PC needed. |
 | `FolkPatch-v5.0-KP0.13.8-Boot-Patcher.zip` | **Safe file mode (advanced)** — patches a stock `boot`/`init_boot` image on your sdcard, **never touches partitions**. You then `fastboot flash` the patched image from a PC. |
 | `FolkPatch-v5.0-KP0.13.8-Uninstaller.zip` | Restores the stock backup, or live-unpatches the kernel. |
 
@@ -91,8 +91,18 @@ This release includes patches for:
    `FolkPatch-v5.0-KP0.13.8-Recovery-Installer.zip`.
 3. The screen shows your **superkey** (`ApXXXXXXXX`) — write it down.
    It's also saved as `FolkPatch-key.txt` on sdcard.
-4. Reboot → install `FolkPatch-Manager.apk` → open the app to verify root.
-5. Bootloop? Flash the **Uninstaller ZIP** or restore your stock image.
+4. Reboot → install `FolkPatch-Manager.apk` from sdcard (auto-copied by the
+   installer, also in `Download/FolkPatch/`) → open the app, enter the
+   superkey **once** → it shows Installed/Active. The kernel is already
+   patched, so root is active — the app just needs the key to connect.
+5. App **already installed**? Just open it after flashing — it detects the
+   patched kernel. Update/upgrade the app normally afterwards; it keeps
+   working with the same superkey.
+6. Bootloop/freeze? Flash the **Uninstaller ZIP** or restore your stock image.
+
+Freeze safety in this build: each A/B slot is patched from **its own** stock
+(no cross-slot image copy), patched size is checked before flashing, and
+re-flashing reuses the saved key instead of writing a mismatched one.
 
 ## Method 2 — Safe (Boot Patcher + fastboot, advanced)
 
@@ -158,9 +168,15 @@ APK rename করে ZIP করলে flash হয় না — recovery-তে
 installer script লাগে, যা APK-তে থাকে না। এই repo সেই layer যোগ করেছে।
 
 - **সহজ (recommended):** Recovery-Installer ZIP flash করো → superkey নোট করো → reboot →
-  Manager APK install।
+  sdcard থেকে Manager APK install করো → অ্যাপ খুলে key একবার দাও → Installed/Active
+  দেখাবে। কার্নেল আগেই প্যাচ হয়ে গেছে, তাই ডিভাইস অটো-রুট — অ্যাপ শুধু key দিয়ে
+  কানেক্ট হয়।
+- **অ্যাপ আগে থেকে install থাকলে:** ফ্ল্যাশের পর শুধু অ্যাপ খোলো — প্যাচ ধরা পড়বে।
+  তারপর অ্যাপ upgrade/normal update করলেও একই key দিয়ে কাজ করবে।
 - **নিরাপদ (advanced):** stock `boot.img` sdcard-তে
   `FolkPatch-stock-boot.img` নামে রাখো → Boot-Patcher ZIP flash করো →
   `FolkPatch-patched-boot.img` PC থেকে `fastboot flash` করো।
-- Bootloop হলে Uninstaller ZIP flash করো বা stock img restore করো।
+- Bootloop/freeze হলে Uninstaller ZIP flash করো বা stock img restore করো।
 - Kernel-এ `CONFIG_KALLSYMS=y` না থাকলে root কাজ করবে না।
+- ফ্রিজ/হঠাৎ power-off এড়াতে: প্রতিটা slot নিজের stock থেকে প্যাচ হয়, ভুল slot-এর
+  image অন্য slot-এ লেখা হয় না, আর flash-এর আগে size check করা হয়।

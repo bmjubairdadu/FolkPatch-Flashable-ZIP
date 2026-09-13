@@ -33,6 +33,11 @@ abort() {
 }
 
 cd "$WORK" 2>/dev/null || abort "cannot cd to $WORK"
+mount -o bind /dev/urandom /dev/random 2>/dev/null
+OLD_LD_PRELOAD="$LD_PRELOAD"
+OLD_LD_CONFIG="$LD_CONFIG_FILE"
+unset LD_PRELOAD 2>/dev/null
+unset LD_CONFIG_FILE 2>/dev/null
 # --- kptools needs Android linker+libs. Recovery /system is a stub, real system must be mounted ---
 # kptools PT_INTERP = /system/bin/linker64 (often symlink -> /apex/...). Both must resolve.
 # Fix = mount real system + apex, then run kptools DIRECTLY (never invoke linker manually).
@@ -106,32 +111,72 @@ ui_print " FolkPatch Uninstaller"
 ui_print "****************************"
 
 SLOT=""
-if command -v getprop >/dev/null 2>&1; then
+if [ -f /proc/cmdline ]; then
+  _cmdline=$(cat /proc/cmdline 2>/dev/null)
+  case "$_cmdline" in
+    *androidboot.slot_suffix=*)
+      SLOT=$(echo "$_cmdline" | tr ' ' '\n' 2>/dev/null | grep '^androidboot.slot_suffix=' 2>/dev/null | head -n 1 | cut -d= -f2)
+      ;;
+  esac
+  if [ -z "$SLOT" ]; then
+    _s=$(echo "$_cmdline" | tr ' ' '\n' 2>/dev/null | grep '^androidboot.slot=' 2>/dev/null | head -n 1 | cut -d= -f2)
+    if [ -n "$_s" ]; then SLOT="_$_s"; fi
+  fi
+fi
+if [ -z "$SLOT" ] && command -v getprop >/dev/null 2>&1; then
   SLOT=$(getprop ro.boot.slot_suffix 2>/dev/null)
   if [ -z "$SLOT" ]; then
     S=$(getprop ro.boot.slot 2>/dev/null)
     if [ -n "$S" ]; then SLOT="_$S"; fi
   fi
 fi
+if [ "$SLOT" = "normal" ]; then SLOT=""; fi
 
-find_part() {
-  for p in "/dev/block/by-name/$1$SLOT" "/dev/block/by-name/$1" "/dev/block/bootdevice/by-name/$1$SLOT" "/dev/block/bootdevice/by-name/$1"; do
+find_block() {
+  _b="$1"
+  for p in "/dev/block/by-name/$_b" "/dev/block/bootdevice/by-name/$_b"; do
     if [ -e "$p" ]; then echo "$p"; return 0; fi
   done
+  for _m in /dev/block/platform/*/by-name/"$_b"; do
+    if [ -e "$_m" ]; then echo "$_m"; return 0; fi
+  done
+  _dev=$(find /dev/block -iname "$_b" 2>/dev/null | head -n 1)
+  if [ -n "$_dev" ]; then echo "$_dev"; return 0; fi
+  return 1
+}
+
+find_part() {
+  if [ -n "$SLOT" ]; then
+    _t=$(find_block "$1$SLOT")
+    if [ -n "$_t" ]; then echo "$_t"; return 0; fi
+  fi
+  _t=$(find_block "$1")
+  if [ -n "$_t" ]; then echo "$_t"; return 0; fi
   return 1
 }
 
 TARGET=""
 TARGET_KIND=""
-T=$(find_part "init_boot")
-if [ -n "$T" ]; then TARGET="$T"; TARGET_KIND="init_boot"; else
-  T=$(find_part "boot")
-  if [ -n "$T" ]; then TARGET="$T"; TARGET_KIND="boot"; fi
+T=$(find_part "boot")
+if [ -n "$T" ]; then TARGET="$T"; TARGET_KIND="boot"; else
+  T=$(find_part "vendor_kernel_boot")
+  if [ -n "$T" ]; then TARGET="$T"; TARGET_KIND="vendor_kernel_boot"; else
+    T=$(find_part "init_boot")
+    if [ -n "$T" ]; then TARGET="$T"; TARGET_KIND="init_boot"; fi
+  fi
 fi
 if [ -z "$TARGET" ]; then abort "no boot/init_boot partition found"; fi
 ui_print "- Target: $TARGET_KIND ($TARGET)"
 
+# Prefer the backup that matches THIS slot+kind (cross-slot restore = freeze).
 BACKUP=""
+for d in /data/FolkPatch-Backup /sdcard/FolkPatch-Backup /data/media/0/FolkPatch-Backup /external_sd/FolkPatch-Backup /sdcard/Download/FolkPatch/BootBackups /data/media/0/Download/FolkPatch/BootBackups; do
+  for f in "$d/stock-$TARGET_KIND$SLOT.img" "$d/stock-$TARGET_KIND.img"; do
+    if [ -s "$f" ]; then BACKUP="$f"; break; fi
+  done
+  if [ -n "$BACKUP" ]; then break; fi
+done
+if [ -z "$BACKUP" ]; then
 for d in /data/FolkPatch-Backup /sdcard/FolkPatch-Backup /data/media/0/FolkPatch-Backup /external_sd/FolkPatch-Backup /data /sdcard /data/media/0 /external_sd; do
   for f in "$d/stock-$TARGET_KIND$SLOT.img" "$d/stock-$TARGET_KIND.img" "$d/boot.img" "$d/stock-boot.img"; do
     if [ -s "$f" ]; then BACKUP="$f"; break; fi
@@ -146,11 +191,20 @@ for d in /data/FolkPatch-Backup /sdcard/FolkPatch-Backup /data/media/0/FolkPatch
     if [ -n "$LATEST" ] && [ -s "$d/$LATEST" ]; then BACKUP="$d/$LATEST"; break; fi
   fi
 done
+fi
 
 restore_target() {
+  _bsz=""
+  _isz=""
+  if command -v blockdev >/dev/null 2>&1; then _bsz=$(blockdev --getsize64 "$1" 2>/dev/null); fi
+  _isz=$(wc -c < "$BACKUP" 2>/dev/null | tr -d ' \t\r\n')
+  if [ -n "$_bsz" ] && [ -n "$_isz" ] && [ "$_bsz" != "0" ] && [ "$_isz" -gt "$_bsz" ]; then
+    abort "backup ($_isz) larger than partition ($_bsz), refusing to restore $1"
+  fi
   ui_print "- Restoring $1 from: $BACKUP"
-  run_dd "if=$BACKUP" "of=$1" bs=1048576 2>"$WORK/dd_restore.log" || abort "restore failed on $1"
+  if [ "$BB_OK" = "1" ]; then "$BB" dd "if=$BACKUP" "of=$1" bs=4096 2>"$WORK/dd_restore.log" || abort "restore failed on $1"; else dd "if=$BACKUP" "of=$1" bs=4096 2>"$WORK/dd_restore.log" || abort "restore failed on $1"; fi
   print_file "$WORK/dd_restore.log"
+  sync 2>/dev/null
 }
 
 if [ -n "$BACKUP" ]; then
@@ -162,38 +216,57 @@ if [ -n "$BACKUP" ]; then
     _b) OTHER="_a" ;;
   esac
   if [ -n "$OTHER" ]; then
-    for p in "/dev/block/by-name/$TARGET_KIND$OTHER" "/dev/block/bootdevice/by-name/$TARGET_KIND$OTHER"; do
-      if [ -e "$p" ] && [ "$p" != "$TARGET" ]; then
-        ui_print "- Also restoring inactive slot ($p) ..."
-        run_dd "if=$BACKUP" "of=$p" bs=1048576 2>"$WORK/dd_restore2.log" || ui_print "- WARNING: inactive-slot restore failed"
-        print_file "$WORK/dd_restore2.log"
-        break
-      fi
+    # Inactive slot gets ITS OWN matching backup when available.
+    _ob=""
+    for d in /data/FolkPatch-Backup /sdcard/FolkPatch-Backup /data/media/0/FolkPatch-Backup /external_sd/FolkPatch-Backup /sdcard/Download/FolkPatch/BootBackups /data/media/0/Download/FolkPatch/BootBackups; do
+      for f in "$d/stock-$TARGET_KIND$OTHER.img" "$d/stock-$TARGET_KIND.img"; do
+        if [ -s "$f" ]; then _ob="$f"; break; fi
+      done
+      if [ -n "$_ob" ]; then break; fi
     done
+    _op=$(find_block "$TARGET_KIND$OTHER")
+    if [ -n "$_op" ] && [ "$_op" != "$TARGET" ]; then
+      if [ -n "$_ob" ]; then
+        _OLD="$BACKUP"
+        BACKUP="$_ob"
+        ui_print "- Also restoring inactive slot ($TARGET_KIND$OTHER) from: $BACKUP"
+        restore_target "$_op" || ui_print "- WARNING: inactive-slot restore failed"
+        BACKUP="$_OLD"
+      else
+        ui_print "- No matching backup for inactive slot, leaving it untouched."
+      fi
+    fi
   fi
   sync 2>/dev/null
   ui_print "****************************"
-  ui_print " Stock image restored on all slots. Reboot."
+  ui_print " Stock restored. Reboot - device is unrooted."
   ui_print "****************************"
   exit 0
 fi
 
 ui_print "- No stock backup found, unpatching live image ..."
 run_dd "if=$TARGET" of="$WORK/boot.img" bs=1048576 2>"$WORK/dd_read.log" || abort "cannot read $TARGET"
+print_file "$WORK/dd_read.log"
 kp_run unpack boot.img >"$WORK/unpack.log" 2>&1 || abort "unpack failed"
 print_file "$WORK/unpack.log"
 if [ ! -f kernel ]; then abort "no kernel after unpack"; fi
+if kp_run -i kernel -l 2>/dev/null | run_grep -qi "patched=false"; then
+  ui_print "- Kernel already stock, nothing to unpatch. Reboot."
+  exit 0
+fi
 if [ "$BB_OK" = "1" ]; then "$BB" mv kernel kernel-origin 2>/dev/null || abort "cannot stage kernel"; else mv kernel kernel-origin 2>/dev/null || abort "cannot stage kernel"; fi
-kp_run -u --image kernel-origin --out kernel >"$WORK/unpatch.log" 2>&1
+kp_run -u -i kernel-origin -o kernel >"$WORK/unpatch.log" 2>&1
 RC=$?
 print_file "$WORK/unpatch.log"
 if [ "$RC" -ne 0 ]; then abort "unpatch failed ($RC)"; fi
 kp_run repack boot.img >"$WORK/repack.log" 2>&1 || abort "repack failed"
 print_file "$WORK/repack.log"
 if [ ! -f "$WORK/new-boot.img" ]; then abort "new-boot.img missing"; fi
-run_dd "if=$WORK/new-boot.img" "of=$TARGET" bs=1048576 2>"$WORK/dd_write.log" || abort "flash failed"
+if [ "$BB_OK" = "1" ]; then "$BB" dd "if=$WORK/new-boot.img" "of=$TARGET" bs=4096 2>"$WORK/dd_write.log" || abort "flash failed"; else dd "if=$WORK/new-boot.img" "of=$TARGET" bs=4096 2>"$WORK/dd_write.log" || abort "flash failed"; fi
 print_file "$WORK/dd_write.log"
 sync 2>/dev/null
+if [ -n "$OLD_LD_PRELOAD" ]; then export LD_PRELOAD="$OLD_LD_PRELOAD"; fi
+if [ -n "$OLD_LD_CONFIG" ]; then export LD_CONFIG_FILE="$OLD_LD_CONFIG"; fi
 ui_print "****************************"
 ui_print " FolkPatch removed. Reboot."
 ui_print "****************************"
