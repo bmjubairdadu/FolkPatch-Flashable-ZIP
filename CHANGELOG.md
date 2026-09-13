@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented here.
 
+## [v5.2-kp0.13.8] — 2026-09-13 — flash-stuck detection
+
+### Fixed
+- 🐛 **"Flash success kintu root nai" dhora:** ekhon flash-er por partition
+  theke abar pore kernel unpack kore `patched=true` check kora hoy. Partition-e
+  unpatched kernel thakle installer sobuj signal deyna — sorasori abort kore.
+- 🐛 Inactive-slot verify ekhon nijer image-er sathe mele (ager byte-compare
+  current-slot image-er sathe chilo — kernel alada hole mithya MISMATCH dekhato).
+- 🐛 Key mode order: combined (`-s` + `-S`) age, tarpor fallback — Manager app
+  duitar jetai khujk, key pabe.
+
 ## [v5.1-kp0.13.8] — 2026-09-13 — auto-root + freeze fixes
 
 ### Fixed

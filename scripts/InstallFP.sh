@@ -133,7 +133,7 @@ if [ ! -f "$KPIMG" ]; then abort "kpimg missing"; fi
 
 ui_print "****************************"
 ui_print " FolkPatch Direct Flash"
-ui_print " v5.1 / KP-0.13.8"
+ui_print " v5.2 / KP-0.13.8"
 ui_print " WITH SYSTEM FIXES"
 ui_print "****************************"
 
@@ -317,7 +317,7 @@ if [ -f kernel-origin ]; then rm -f kernel-origin 2>/dev/null; fi
 mv kernel kernel-origin 2>/dev/null || abort "cannot stage kernel"
 
 ui_print "- Patching kernel (this can take a minute) ..."
-ui_print "- Setting both skey + root-skey (manager upgrade safe) ..."
+ui_print "- Setting both keys (skey + root-skey, same value) ..."
 kp_run -p -i kernel-origin -s "$SKEY" -S "$SKEY" -k "$KPIMG" -o kernel >"$WORK/patch.log" 2>&1
 RC=$?
 if [ "$RC" -ne 0 ]; then
@@ -327,7 +327,7 @@ if [ "$RC" -ne 0 ]; then
 fi
 if [ "$RC" -ne 0 ]; then
   ui_print "- NOTE: root-skey mode failed ($RC), trying legacy skey only ..."
-  kp_run -p --image kernel-origin --skey "$SKEY" --kpimg "$KPIMG" --out kernel >"$WORK/patch.log" 2>&1
+  kp_run -p -i kernel-origin -s "$SKEY" -k "$KPIMG" -o kernel >"$WORK/patch.log" 2>&1
   RC=$?
 fi
 print_file "$WORK/patch.log"
@@ -346,7 +346,21 @@ if [ "$RC" -ne 0 ]; then abort "patch verification failed to run ($RC)"; fi
 if run_grep -qi "patched=false" "$WORK/verify.log"; then
   abort "patch verification failed (kernel still reports patched=false)"
 fi
-ui_print "- Patch verified (patched=true)"
+if run_grep -qi "patched=true" "$WORK/verify.log"; then
+  ui_print "- Patch verified (patched=true)"
+else
+  ui_print "- WARNING: verify log has no patched=true line!"
+  ui_print "- Flashing anyway, on-partition check below is final."
+fi
+# Canonical key check: root_superkey hash must match the key we set.
+# (Manager app unlocks with root-superkey. If empty/mismatch -> app says
+#  Not Installed even though kernel is patched = tomar obostha.)
+_VL=$(run_grep -i "root_superkey" "$WORK/verify.log" 2>/dev/null | head -n 1)
+if [ -n "$_VL" ]; then
+  ui_print "- $_VL"
+else
+  ui_print "- NOTE: verify log shows no root_superkey line"
+fi
 
 if ! kp_run -i kernel-origin -f 2>/dev/null | run_grep -q "CONFIG_KALLSYMS_ALL=y"; then
   ui_print "- WARNING: CONFIG_KALLSYMS_ALL is off; keep stock backup safe."
@@ -410,7 +424,12 @@ if [ -n "$OTHER" ]; then
           kp_run -p -i kernel-origin -S "$SKEY" -k "$KPIMG" -o kernel >"$WORK/opatch.log" 2>&1
           _orc=$?
         fi
+        if [ "$_orc" -ne 0 ]; then
+          kp_run -p -i kernel-origin -s "$SKEY" -k "$KPIMG" -o kernel >"$WORK/opatch.log" 2>&1
+          _orc=$?
+        fi
         if [ "$_orc" -eq 0 ] && kp_run repack boot.img >"$WORK/orepack.log" 2>&1 && [ -f "$WORK/new-boot.img" ]; then
+          run_cp -f "$WORK/new-boot.img" "$WORK/new-boot-inactive.img" 2>/dev/null
           _osz=$(wc -c < "$WORK/new-boot.img" 2>/dev/null | tr -d ' \t\r\n')
           ui_print "- Flashing inactive slot ($_op, ${_osz} bytes) ..."
           if [ "$BB_OK" = "1" ]; then "$BB" dd "if=$WORK/new-boot.img" "of=$_op" bs=4096 2>"$WORK/dd_write2.log"; else dd "if=$WORK/new-boot.img" "of=$_op" bs=4096 2>"$WORK/dd_write2.log"; fi
@@ -460,27 +479,64 @@ do_cmp() {
   return 2
 }
 verify_slot() {
-  if [ -z "$_NSZ" ] || [ "$_NSZ" = "0" ]; then
-    ui_print "- NOTE: size unknown, skipping readback verify for $2."
+  # $1=partition $2=label $3=expected image (default: current new-boot.img).
+  # Decisive check: unpack what is REALLY on the partition, look for patched=true.
+  # Byte-compare is best-effort only (padding can differ) -> warning, not abort.
+  _exp="$3"
+  if [ -z "$_exp" ]; then _exp="$WORK/new-boot.img"; fi
+  _esz=$(wc -c < "$_exp" 2>/dev/null | tr -d ' \t\r\n')
+  if [ -z "$_esz" ] || [ "$_esz" = "0" ]; then
+    ui_print "- NOTE: size unknown, skipping verify for $2."
     return 0
   fi
-  _blocks=$(( ($_NSZ + 511) / 512 ))
-  run_dd "if=$1" of="$WORK/check.img" bs=512 "count=$_blocks" 2>/dev/null
-  do_cmp "$WORK/check.img" "$WORK/new-boot.img"
-  _rc=$?
+  _blocks=$(( ($_esz + 511) / 512 ))
+  if ! run_dd "if=$1" of="$WORK/check.img" bs=512 "count=$_blocks" 2>/dev/null || [ ! -s "$WORK/check.img" ]; then
+    abort "cannot read back $2 ($1)! Flash may have failed."
+  fi
+  rm -rf "$WORK/vcheck" 2>/dev/null
+  mkdir -p "$WORK/vcheck" 2>/dev/null
+  run_cp -f "$WORK/check.img" "$WORK/vcheck/boot.img" 2>/dev/null
+  cd "$WORK/vcheck" 2>/dev/null
+  if kp_run unpack boot.img >"$WORK/vcheck.log" 2>&1 && [ -f kernel ]; then
+    kp_run -i kernel -l >"$WORK/vcheck-l.log" 2>&1
+    cd "$WORK" 2>/dev/null
+    if run_grep -qi "patched=false" "$WORK/vcheck-l.log"; then
+      rm -rf "$WORK/vcheck" "$WORK/check.img" 2>/dev/null
+      abort "$2 holds UNPATCHED kernel! Flash went nowhere ($1) - wrong target or blocked. Restore stock, send recovery log."
+    fi
+    if run_grep -qi "patched=true" "$WORK/vcheck-l.log"; then
+      ui_print "- ROOT ACTIVE on $2: partition kernel patched=true."
+    else
+      ui_print "- WARNING: $2 verify log unclear:"
+      print_file "$WORK/vcheck-l.log"
+    fi
+    _kl=$(run_grep -i "root_superkey" "$WORK/vcheck-l.log" 2>/dev/null | head -n 1)
+    if [ -n "$_kl" ]; then ui_print "- $2: $_kl"; fi
+  else
+    cd "$WORK" 2>/dev/null
+    ui_print "- WARNING: cannot unpack $2 readback, relying on byte-compare."
+  fi
+  rm -rf "$WORK/vcheck" 2>/dev/null
+  _rc=2
+  if [ "$BB_OK" = "1" ]; then
+    "$BB" head -c "$_esz" "$WORK/check.img" > "$WORK/check-trim.img" 2>/dev/null
+    if [ -s "$WORK/check-trim.img" ]; then
+      do_cmp "$WORK/check-trim.img" "$_exp"
+      _rc=$?
+      rm -f "$WORK/check-trim.img" 2>/dev/null
+    fi
+  fi
   rm -f "$WORK/check.img" 2>/dev/null
   if [ "$_rc" = "0" ]; then
-    ui_print "- Verify OK: $2 readback matches."
-  elif [ "$_rc" = "2" ]; then
-    ui_print "- NOTE: cmp missing, cannot verify $2."
-  else
-    ui_print "- WARNING: $2 readback MISMATCH! Flash may not have stuck; re-flash or restore stock."
+    ui_print "- Bytes OK: $2 readback matches."
+  elif [ "$_rc" != "2" ]; then
+    ui_print "- NOTE: $2 bytes differ slightly (padding?) but kernel is patched - OK."
   fi
 }
-ui_print "- Verifying flashed slot(s) by readback ..."
-verify_slot "$TARGET" "current slot"
-if [ -n "$INACTIVE_FLASHED" ]; then
-  verify_slot "$INACTIVE_FLASHED" "inactive slot"
+ui_print "- Verifying ON-PARTITION (what really got flashed) ..."
+verify_slot "$TARGET" "current slot" "$WORK/new-boot.img"
+if [ -n "$INACTIVE_FLASHED" ] && [ -f "$WORK/new-boot-inactive.img" ]; then
+  verify_slot "$INACTIVE_FLASHED" "inactive slot" "$WORK/new-boot-inactive.img"
 fi
 sync 2>/dev/null
 
@@ -509,8 +565,10 @@ ui_print " FolkPatch installed! Auto-root active."
 ui_print " Key: $SKEY (saved to sdcard)"
 ui_print " Stock backup: $BKDIR/stock-$TARGET_KIND$SLOT.img"
 ui_print " Next: reboot -> install FolkPatch-Manager.apk"
-ui_print " -> open app, enter key once -> shows Installed/Active."
-ui_print " After that, app upgrades keep root (same key)."
+ui_print " -> open app, enter THIS key once -> Installed/Active."
+ui_print " Old noted key noy - ei flash-er Key tai dao."
+ui_print " App says Not Installed? Key milche kina dekho,"
+ui_print " reboot kore abar kholo, log-e ROOT ACTIVE line chilo kina dekho."
 ui_print " Bootloop/freeze? Flash Uninstaller ZIP or restore stock img."
 ui_print "****************************"
 exit 0

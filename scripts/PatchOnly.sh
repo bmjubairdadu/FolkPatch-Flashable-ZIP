@@ -197,6 +197,10 @@ ui_print "- Verifying ..."
 kp_run -i kernel -l >"$WORK/verify.log" 2>&1
 print_file "$WORK/verify.log"
 if run_grep -qi "patched=false" "$WORK/verify.log"; then abort "verify failed (patched=false)"; fi
+if run_grep -qi "patched=true" "$WORK/verify.log"; then
+  ui_print "- File patched=true. Flash it, then Manager app-e ei key dao."
+fi
+run_grep -i "superkey" "$WORK/verify.log" 2>/dev/null | while IFS= read -r _kl || [ -n "$_kl" ]; do ui_print "- $_kl"; done
 if ! kp_run -i kernel-origin -f 2>/dev/null | run_grep -q "CONFIG_KALLSYMS_ALL=y"; then
   ui_print "- WARNING: CONFIG_KALLSYMS_ALL off; keep stock backup safe."
 fi

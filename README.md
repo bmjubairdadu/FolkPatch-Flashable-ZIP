@@ -33,13 +33,13 @@ This project provides **complete flashable ZIPs with**:
 
 Get the ZIPs from the
 [**Releases page**](https://github.com/bmjubairdadu/FolkPatch-Flashable-ZIP/releases)
-(`v5.1-kp0.13.8`):
+(`v5.2-kp0.13.8`):
 
 | File | What it does |
 |---|---|
-| `FolkPatch-v5.1-kp0.13.8-Recovery-Installer.zip` | ⭐ **Recommended — Direct flash** — patches & flashes `boot` (kernel lives here on old **and** new devices) with `vendor_kernel_boot`/`init_boot` fallback. Easiest, no PC needed. |
-| `FolkPatch-v5.1-kp0.13.8-Boot-Patcher.zip` | **Safe file mode (advanced)** — patches a stock `boot`/`init_boot` image on your sdcard, **never touches partitions**. You then `fastboot flash` the patched image from a PC. |
-| `FolkPatch-v5.1-kp0.13.8-Uninstaller.zip` | Restores the stock backup, or live-unpatches the kernel. |
+| `FolkPatch-v5.2-kp0.13.8-Recovery-Installer.zip` | ⭐ **Recommended — Direct flash** — patches & flashes `boot` (kernel lives here on old **and** new devices) with `vendor_kernel_boot`/`init_boot` fallback. Easiest, no PC needed. |
+| `FolkPatch-v5.2-kp0.13.8-Boot-Patcher.zip` | **Safe file mode (advanced)** — patches a stock `boot`/`init_boot` image on your sdcard, **never touches partitions**. You then `fastboot flash` the patched image from a PC. |
+| `FolkPatch-v5.2-kp0.13.8-Uninstaller.zip` | Restores the stock backup, or live-unpatches the kernel. |
 
 Each ZIP also bundles the `FolkPatch-Manager.apk` (copied to sdcard on install)
 and a `README.txt` (Bangla guide).
@@ -88,7 +88,7 @@ This release includes patches for:
 
 1. Copy the Installer ZIP (and the APK) to sdcard.
 2. Boot recovery → Install → flash
-   `FolkPatch-v5.1-kp0.13.8-Recovery-Installer.zip`.
+   `FolkPatch-v5.2-kp0.13.8-Recovery-Installer.zip`.
 3. The screen shows your **superkey** (`ApXXXXXXXX`) — write it down.
    It's also saved as `FolkPatch-key.txt` on sdcard.
 4. Reboot → install `FolkPatch-Manager.apk` from sdcard (auto-copied by the
@@ -104,12 +104,23 @@ Freeze safety in this build: each A/B slot is patched from **its own** stock
 (no cross-slot image copy), patched size is checked before flashing, and
 re-flashing reuses the saved key instead of writing a mismatched one.
 
+### Flash success kintu root nai? (checklist)
+
+1. Recovery log-e **`ROOT ACTIVE on current slot`** ache kina dekho — na
+   thakle flash asole partition-e atkani (vul target / flash blocked).
+2. Reboot-er por `FolkPatch-Manager.apk` install kore **ei flash-er Key tai**
+   dao — age note kora purono key noy.
+3. App-e `Installed/Active` na asle recovery log-er `Verify` / `root_superkey`
+   line + app screenshot niye issue kholo.
+4. OrangeFox/custom ROM-e majhe majhe age Uninstaller diye stock-e fire,
+   reboot, tarpor abar flash korle kaaj kore.
+
 ## Method 2 — Safe (Boot Patcher + fastboot, advanced)
 
 1. Put your **stock** `boot.img` / `init_boot.img` (from your firmware) on
    sdcard, named:
    `FolkPatch-stock-boot.img` (or `FolkPatch-stock-init_boot.img`).
-2. Flash `FolkPatch-v5.1-kp0.13.8-Boot-Patcher.zip` from recovery
+2. Flash `FolkPatch-v5.2-kp0.13.8-Boot-Patcher.zip` from recovery
    (it does **not** touch any partition).
 3. It writes `FolkPatch-patched-boot.img` to sdcard.
 4. On PC: `fastboot flash boot <file>`
@@ -118,7 +129,7 @@ re-flashing reuses the saved key instead of writing a mismatched one.
 
 ## Uninstall
 
-Flash `FolkPatch-v5.1-kp0.13.8-Uninstaller.zip`.
+Flash `FolkPatch-v5.2-kp0.13.8-Uninstaller.zip`.
 If a stock backup (`FolkPatch-Backup/stock-*.img`) exists it is restored
 automatically.
 
@@ -143,7 +154,7 @@ official FolkPatch APK and packs the ZIPs:
 
 ```sh
 python tools/build.py
-# outputs dist/FolkPatch-v5.0-KP0.13.8-*.zip + SHA256SUMS.txt
+# outputs dist/FolkPatch-v5.2-kp0.13.8-*.zip + SHA256SUMS.txt
 ```
 
 Pushing a `v*` tag runs the same build in GitHub Actions and attaches the
